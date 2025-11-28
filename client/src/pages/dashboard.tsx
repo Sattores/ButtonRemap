@@ -90,6 +90,7 @@ const PRESETS = [
 
 export default function Dashboard() {
   const [devices, setDevices] = useState<Device[]>(MOCK_DEVICES);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -105,6 +106,12 @@ export default function Dashboard() {
   const { toast } = useToast();
 
   const selectedDevice = devices.find(d => d.id === selectedDeviceId);
+  
+  const filteredDevices = devices.filter(device => 
+    device.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    device.vid.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    device.pid.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // --- Handlers ---
 
@@ -206,20 +213,32 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground font-medium">v2.1.0 PRO</p>
             </div>
           </div>
-
-          <div className="flex gap-2 mt-2">
-            <Button 
-              variant={isMonitoring ? "default" : "outline"} 
-              size="sm" 
-              className={`flex-1 transition-all duration-300 ${isMonitoring ? "animate-pulse ring-2 ring-primary/20 border-primary" : ""}`}
-              onClick={toggleMonitoring}
-            >
-              {isMonitoring ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Search className="w-3.5 h-3.5 mr-2" />}
-              {isMonitoring ? "Detecting..." : "Find Button"}
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleRefresh}>
-              <RefreshCw className="w-4 h-4" />
-            </Button>
+          
+          {/* Search & Refresh */}
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search devices..." 
+                className="pl-9 bg-background/50" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+                <Button 
+                variant={isMonitoring ? "default" : "outline"} 
+                size="sm" 
+                className={`flex-1 transition-all duration-300 ${isMonitoring ? "animate-pulse ring-2 ring-primary/20 border-primary" : ""}`}
+                onClick={toggleMonitoring}
+                >
+                {isMonitoring ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-2" />}
+                {isMonitoring ? "Detecting..." : "Find Button"}
+                </Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={handleRefresh}>
+                    <RefreshCw className="w-4 h-4" />
+                </Button>
+            </div>
           </div>
         </div>
 
@@ -228,47 +247,53 @@ export default function Dashboard() {
         <div className="flex-1 px-4 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
           <div className="space-y-1">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">Detected Devices</h3>
-            {devices.map(device => (
-              <motion.div
-                key={device.id}
-                layoutId={`device-${device.id}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                onClick={() => handleSelectDevice(device.id)}
-              >
-                <div 
-                  className={`
-                    group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 border
-                    ${selectedDeviceId === device.id 
-                      ? "bg-sidebar-primary/10 border-sidebar-primary/20 shadow-sm" 
-                      : "bg-transparent border-transparent hover:bg-sidebar-accent hover:border-sidebar-border"
-                    }
-                    ${device.status === 'disconnected' ? 'opacity-60 grayscale' : ''}
-                  `}
+            {filteredDevices.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                <p>No devices found</p>
+              </div>
+            ) : (
+              filteredDevices.map(device => (
+                <motion.div
+                  key={device.id}
+                  layoutId={`device-${device.id}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  onClick={() => handleSelectDevice(device.id)}
                 >
-                  <div className={`
-                    w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.2)] transition-colors
-                    ${device.status === "configured" ? "bg-green-500 shadow-green-500/40" : 
-                      device.status === "connected" ? "bg-amber-500 shadow-amber-500/40" : "bg-slate-300 shadow-none"}
-                  `} />
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className={`text-sm font-medium truncate ${selectedDeviceId === device.id ? "text-primary" : "text-foreground"}`}>
-                        {device.name}
-                      </span>
-                      {device.status === "configured" && (
-                        <CheckCircle2 className="w-3 h-3 text-green-500 ml-2" />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
-                      <span className="bg-sidebar-accent px-1 rounded text-foreground/70">{device.vid}:{device.pid}</span>
-                      {device.status === 'disconnected' && <span className="text-destructive font-semibold">OFFLINE</span>}
+                  <div 
+                    className={`
+                      group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 border
+                      ${selectedDeviceId === device.id 
+                        ? "bg-sidebar-primary/10 border-sidebar-primary/20 shadow-sm" 
+                        : "bg-transparent border-transparent hover:bg-sidebar-accent hover:border-sidebar-border"
+                      }
+                      ${device.status === 'disconnected' ? 'opacity-60 grayscale' : ''}
+                    `}
+                  >
+                    <div className={`
+                      w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.2)] transition-colors
+                      ${device.status === "configured" ? "bg-green-500 shadow-green-500/40" : 
+                        device.status === "connected" ? "bg-amber-500 shadow-amber-500/40" : "bg-slate-300 shadow-none"}
+                    `} />
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className={`text-sm font-medium truncate ${selectedDeviceId === device.id ? "text-primary" : "text-foreground"}`}>
+                          {device.name}
+                        </span>
+                        {device.status === "configured" && (
+                          <CheckCircle2 className="w-3 h-3 text-green-500 ml-2" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+                        <span className="bg-sidebar-accent px-1 rounded text-foreground/70">{device.vid}:{device.pid}</span>
+                        {device.status === 'disconnected' && <span className="text-destructive font-semibold">OFFLINE</span>}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
 
@@ -499,16 +524,6 @@ export default function Dashboard() {
                 <div className="max-w-md space-y-2">
                   <h2 className="text-2xl font-bold text-foreground">No Device Selected</h2>
                   <p>Select a USB device from the sidebar to configure it, or use the detection mode to find your button.</p>
-                </div>
-                <div className="flex gap-4">
-                    <Button onClick={toggleMonitoring} size="lg" className="rounded-full px-8 shadow-xl shadow-primary/20">
-                        <Search className="w-4 h-4 mr-2" />
-                        Find by Press
-                    </Button>
-                    <Button variant="secondary" size="lg" className="rounded-full px-8" onClick={handleRefresh}>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Refresh List
-                    </Button>
                 </div>
               </motion.div>
             )}
