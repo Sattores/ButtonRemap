@@ -23,7 +23,7 @@ import {
   Power,
   Globe,
   Loader2,
-  XCircle,
+  Eraser,
   Mic,
   MicOff,
   Sparkles,
@@ -406,47 +406,82 @@ export default function Dashboard() {
                         </p>
                     </div>
                 ) : (
-                    /* Configuration Form */
-                    <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
-                    <div className="col-span-8 space-y-6">
-                        <Card className="border-none shadow-lg bg-white/80 backdrop-blur-md h-full">
-                        <CardHeader>
+                    /* Configuration Form - Centered Single Column */
+                    <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col gap-6">
+                        <Card className="border-none shadow-lg bg-white/80 backdrop-blur-md h-full flex flex-col">
+                        <CardHeader className="pb-2">
                             <CardTitle className="text-lg flex items-center gap-2">
                             <Settings className="w-5 h-5 text-primary" />
-                            Action Settings
+                            Configuration
                             </CardTitle>
-                            <CardDescription>Configure what happens when you press the button.</CardDescription>
+                            <CardDescription>Setup the action for this button</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-8">
+                        <CardContent className="space-y-6 flex-1">
+                            
+                            {/* Quick Presets Dropdown */}
                             <div className="space-y-2">
-                            <Label htmlFor="app-path">Application Path</Label>
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Preset</Label>
+                                <Select onValueChange={(val) => {
+                                    const allPresets = PRESETS.flatMap(p => p.items);
+                                    const selected = allPresets.find(p => p.name === val);
+                                    if (selected) applyPreset(selected);
+                                }}>
+                                    <SelectTrigger className="h-12 bg-secondary/30 border-border/50">
+                                        <SelectValue placeholder="Select a preset..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {PRESETS.map((category, i) => (
+                                            <React.Fragment key={i}>
+                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{category.category}</div>
+                                                {category.items.map(item => (
+                                                    <SelectItem key={item.name} value={item.name}>
+                                                        <div className="flex items-center gap-2">
+                                                            {item.icon}
+                                                            <span>{item.name}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                                {i < PRESETS.length - 1 && <Separator className="my-1" />}
+                                            </React.Fragment>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* App Path */}
+                            <div className="space-y-2">
+                            <Label htmlFor="app-path" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Application Path</Label>
                             <div className="flex gap-2">
                                 <Input 
                                 id="app-path" 
-                                placeholder="C:\Windows\System32\calc.exe" 
+                                placeholder="C:\Path\To\Application.exe" 
                                 value={config.appPath}
                                 onChange={(e) => setConfig({...config, appPath: e.target.value})}
-                                className="font-mono text-sm bg-background/50"
+                                className="font-mono text-sm bg-background/50 h-10"
                                 />
-                                <Button variant="secondary">Browse</Button>
+                                <Button variant="secondary" className="px-3">
+                                    <MoreVertical className="w-4 h-4 rotate-90" />
+                                </Button>
                             </div>
                             </div>
 
+                            {/* Arguments */}
                             <div className="space-y-2">
-                            <Label htmlFor="app-args">Arguments (Optional)</Label>
+                            <Label htmlFor="app-args" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Arguments</Label>
                             <Input 
                                 id="app-args" 
-                                placeholder="--fullscreen --silent" 
+                                placeholder="e.g. --fullscreen --silent" 
                                 value={config.appArgs}
                                 onChange={(e) => setConfig({...config, appArgs: e.target.value})}
-                                className="font-mono text-sm bg-background/50"
+                                className="font-mono text-sm bg-background/50 h-10"
                             />
                             </div>
 
-                            <Separator />
+                            <Separator className="my-2" />
 
+                            {/* Trigger Type */}
                             <div className="space-y-3">
-                            <Label>Trigger Type</Label>
+                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Trigger Type</Label>
                             <div className="grid grid-cols-3 gap-4">
                                 {[
                                 { id: "single-press", label: "Single Press", icon: MousePointerClick, desc: "Standard click" },
@@ -457,7 +492,7 @@ export default function Dashboard() {
                                     key={type.id}
                                     onClick={() => setConfig({...config, actionType: type.id as any})}
                                     className={`
-                                    cursor-pointer rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all relative overflow-hidden
+                                    cursor-pointer rounded-xl border-2 p-3 flex flex-col items-center gap-2 transition-all relative overflow-hidden
                                     ${config.actionType === type.id 
                                         ? "border-primary bg-primary/5 text-primary" 
                                         : "border-transparent bg-secondary/50 hover:bg-secondary hover:scale-[1.02]"
@@ -467,10 +502,9 @@ export default function Dashboard() {
                                     {config.actionType === type.id && (
                                         <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full" />
                                     )}
-                                    <type.icon className="w-6 h-6 mb-1" />
+                                    <type.icon className="w-5 h-5 mb-1" />
                                     <div className="text-center">
                                         <div className="text-sm font-bold leading-none mb-1">{type.label}</div>
-                                        <div className="text-[10px] text-muted-foreground opacity-80">{type.desc}</div>
                                     </div>
                                 </div>
                                 ))}
@@ -478,45 +512,6 @@ export default function Dashboard() {
                             </div>
                         </CardContent>
                         </Card>
-                    </div>
-
-                    {/* Sidebar / Presets */}
-                    <div className="col-span-4 space-y-6">
-                        <Card className="border-none shadow-md bg-white/60 backdrop-blur-sm h-full flex flex-col">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                                <Zap className="w-4 h-4" /> Quick Presets
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6 flex-1 overflow-y-auto pr-2">
-                            {PRESETS.map((category, i) => (
-                                <div key={i} className="space-y-2">
-                                    <h4 className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest pl-1">{category.category}</h4>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {category.items.map((preset) => (
-                                        <Button
-                                            key={preset.name}
-                                            variant="outline"
-                                            className="w-full justify-start h-auto py-2.5 px-3 border-border/50 hover:border-primary/50 hover:bg-primary/5 group relative overflow-hidden"
-                                            onClick={() => applyPreset(preset)}
-                                        >
-                                            <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center mr-3 group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
-                                            {preset.icon}
-                                            </div>
-                                            <div className="text-left min-w-0 flex-1">
-                                            <div className="font-medium text-sm truncate">{preset.name}</div>
-                                            <div className="text-[10px] text-muted-foreground truncate opacity-70 font-mono">
-                                                {preset.path.split('\\').pop() || preset.path}
-                                            </div>
-                                            </div>
-                                        </Button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </CardContent>
-                        </Card>
-                    </div>
                     </div>
                 )}
               </motion.div>
@@ -555,7 +550,7 @@ export default function Dashboard() {
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLogs([])}>
                     <span className="sr-only">Clear</span>
-                    <XCircle className="w-3 h-3" />
+                    <Eraser className="w-3 h-3" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Clear Logs</TooltipContent>
