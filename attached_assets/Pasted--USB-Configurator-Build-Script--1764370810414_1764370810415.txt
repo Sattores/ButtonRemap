@@ -1,0 +1,66 @@
+
+╔══════════════════════════════════════════╗
+║     USB Configurator - Build Script      ║
+╚══════════════════════════════════════════╝
+
+[1/5] Проверка инструментов...
+  √ Node.js v20.11.0
+  √ rustc 1.91.1 (ed61e7d7e 2025-11-07)
+
+[2/5] Настройка конфигурации...
+  √ package.json обновлён
+  √ vite.config.ts обновлён
+
+[3/5] Установка зависимостей...
+  - Установка npm пакетов...
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: '@vitejs/plugin-react@5.1.0',
+npm WARN EBADENGINE   required: { node: '^20.19.0 || >=22.12.0' },
+npm WARN EBADENGINE   current: { node: 'v20.11.0', npm: '10.2.4' }
+npm WARN EBADENGINE }
+npm WARN EBADENGINE Unsupported engine {
+npm WARN EBADENGINE   package: 'vite@7.1.12',
+npm WARN EBADENGINE   required: { node: '^20.19.0 || >=22.12.0' },
+npm WARN EBADENGINE   current: { node: 'v20.11.0', npm: '10.2.4' }
+npm WARN EBADENGINE }
+
+added 295 packages, and audited 296 packages in 7s
+
+27 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+  √ npm зависимости готовы
+
+[4/5] Сборка приложения...
+  Это может занять несколько минут...
+
+
+> usb-configurator@2.1.0 tauri:build
+> tauri build
+
+        Info Looking up installed tauri packages to check mismatched versions...
+       Error Failed to parse version `2` for crate `tauri`
+       Error Failed to parse version `2` for crate `tauri-plugin-shell`
+        Warn The bundle identifier "com.usb-configurator.app" set in `tauri.conf.json identifier` ends with `.app`. This is not recommended because it conflicts with the application bundle extension on macOS.
+     Running beforeBuildCommand `npm run build`
+
+> usb-configurator@2.1.0 build
+> vite build
+
+You are using Node.js 20.11.0. Vite requires Node.js version 20.19+ or 22.12+. Please upgrade your Node.js version.
+vite v7.1.12 building for production...
+✓ 17 modules transformed.
+✗ Build failed in 268ms
+error during build:
+[vite:css] [postcss] It looks like you're trying to use `tailwindcss` directly as a PostCSS plugin. The PostCSS plugin has moved to a separate package, so to continue using Tailwind CSS with PostCSS you'll need to install `@tailwindcss/postcss` and update your PostCSS configuration.
+file: D:/MyProjects/ButtonRemap/client/src/index.css:undefined:NaN
+    at ot (D:\MyProjects\ButtonRemap\node_modules\tailwindcss\dist\lib.js:38:1629)
+    at LazyResult.runOnRoot (D:\MyProjects\ButtonRemap\node_modules\postcss\lib\lazy-result.js:361:16)
+    at LazyResult.runAsync (D:\MyProjects\ButtonRemap\node_modules\postcss\lib\lazy-result.js:290:26)
+    at LazyResult.async (D:\MyProjects\ButtonRemap\node_modules\postcss\lib\lazy-result.js:192:30)
+    at LazyResult.then (D:\MyProjects\ButtonRemap\node_modules\postcss\lib\lazy-result.js:436:17)
+beforeBuildCommand `npm run build` failed with exit code 1
+       Error beforeBuildCommand `npm run build` failed with exit code 1
+
+  X Ошибка сборки!
