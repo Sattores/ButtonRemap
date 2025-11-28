@@ -578,7 +578,19 @@ export default function Dashboard() {
                                 className="font-mono text-sm bg-background/50 h-10"
                                 data-testid="input-app-path"
                                 />
-                                <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0" data-testid="button-browse-file">
+                                <Button 
+                                  variant="secondary" 
+                                  size="icon" 
+                                  className="h-10 w-10 shrink-0" 
+                                  data-testid="button-browse-file"
+                                  onClick={async () => {
+                                    const result = await TauriBridge.openFileDialog(["exe", "bat", "cmd", "ps1", "py"]);
+                                    if (result.success && result.data) {
+                                      setConfig(prev => ({ ...prev, appPath: result.data! }));
+                                      toast({ title: "File Selected", description: result.data });
+                                    }
+                                  }}
+                                >
                                     <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                             </div>
