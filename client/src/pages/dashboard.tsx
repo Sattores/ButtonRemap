@@ -24,14 +24,13 @@ import {
   Globe,
   Loader2,
   Eraser,
-  Mic,
-  MicOff,
-  Sparkles,
-  MessageSquare,
-  Camera,
-  Bot
+  Download,
+  Pause,
+  PlayCircle,
+  MoreHorizontal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -110,6 +109,7 @@ export default function Dashboard() {
     appArgs: "",
     actionType: "single-press",
   });
+  const [isAutoScroll, setIsAutoScroll] = useState(true);
   const { toast } = useToast();
 
   const selectedDevice = devices.find(d => d.id === selectedDeviceId);
@@ -384,15 +384,6 @@ export default function Dashboard() {
                       <span className="text-xs text-muted-foreground ml-2">Connected via USB HID</span>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="bg-background/50 backdrop-blur" onClick={() => addLog("info", "Test trigger sent")} disabled={selectedDevice.status === 'disconnected'}>
-                      <Play className="w-4 h-4 mr-2 text-blue-500" /> Test
-                    </Button>
-                    <Button onClick={handleSaveConfig} disabled={isSaving || selectedDevice.status === 'disconnected'} className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow min-w-[140px]">
-                      {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                      {isSaving ? "Saving..." : "Save Config"}
-                    </Button>
-                  </div>
                 </div>
 
                 {selectedDevice.status === 'disconnected' ? (
@@ -459,8 +450,8 @@ export default function Dashboard() {
                                 onChange={(e) => setConfig({...config, appPath: e.target.value})}
                                 className="font-mono text-sm bg-background/50 h-10"
                                 />
-                                <Button variant="secondary" className="px-3">
-                                    <MoreVertical className="w-4 h-4 rotate-90" />
+                                <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0">
+                                    <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                             </div>
                             </div>
@@ -510,6 +501,19 @@ export default function Dashboard() {
                                 ))}
                             </div>
                             </div>
+                            
+                            <div className="flex-1" />
+                            
+                            {/* Footer Actions */}
+                            <div className="flex items-center justify-end gap-3 pt-2">
+                                <Button variant="ghost" onClick={() => addLog("info", "Test trigger sent")} className="text-muted-foreground hover:text-primary">
+                                    <PlayCircle className="w-4 h-4 mr-2" /> Test Action
+                                </Button>
+                                <Button onClick={handleSaveConfig} disabled={isSaving} className="min-w-[140px] shadow-lg shadow-primary/20 hover:shadow-primary/30">
+                                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                    {isSaving ? "Saving..." : "Save Config"}
+                                </Button>
+                            </div>
                         </CardContent>
                         </Card>
                     </div>
@@ -545,19 +549,43 @@ export default function Dashboard() {
               <Terminal className="w-4 h-4 text-muted-foreground" />
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System Logs</span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 border-r border-border/50 pr-3 mr-1">
+                 <Label htmlFor="autoscroll" className="text-[10px] text-muted-foreground uppercase font-bold cursor-pointer">Auto-scroll</Label>
+                 <Switch id="autoscroll" checked={isAutoScroll} onCheckedChange={setIsAutoScroll} className="scale-75" />
+              </div>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setLogs([])}>
-                    <span className="sr-only">Clear</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                      const text = logs.map(l => `[${l.timestamp.toISOString()}] ${l.type.toUpperCase()}: ${l.message}`).join('\n');
+                      // Mock save
+                      toast({ title: "Logs Saved", description: "Saved to logs.txt" });
+                  }}>
+                    <Download className="w-3 h-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Save to File</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                      const text = logs.map(l => `[${l.timestamp.toISOString()}] ${l.type.toUpperCase()}: ${l.message}`).join('\n');
+                      navigator.clipboard.writeText(text);
+                      toast({ title: "Copied", description: "Logs copied to clipboard" });
+                  }}>
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy to Clipboard</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive" onClick={() => setLogs([])}>
                     <Eraser className="w-3 h-3" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Clear Logs</TooltipContent>
               </Tooltip>
-              <Button variant="ghost" size="icon" className="h-6 w-6">
-                <Copy className="w-3 h-3" />
-              </Button>
             </div>
           </div>
           <div className="flex-1 p-4 font-mono text-xs overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
