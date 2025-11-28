@@ -27,7 +27,8 @@ import {
   Download,
   Pause,
   PlayCircle,
-  MoreHorizontal
+  MoreHorizontal,
+  Unlink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -192,6 +193,20 @@ export default function Dashboard() {
     } else {
         addLog("info", `Selected device: ${device?.name} (${device?.vid}:${device?.pid})`);
     }
+  };
+
+  const handleResetConfig = () => {
+    if (!selectedDevice) return;
+    
+    setConfig({ appPath: "", appArgs: "", actionType: "single-press" });
+    
+    // Simulate API call to clear
+    addLog("info", `Configuration cleared for ${selectedDevice.vid}:${selectedDevice.pid}`);
+    toast({ title: "Reset", description: "Button configuration cleared" });
+    
+    setDevices(prev => prev.map(d => 
+      d.id === selectedDeviceId ? { ...d, status: "connected" } : d
+    ));
   };
 
   const applyPreset = (preset: any) => {
@@ -505,14 +520,29 @@ export default function Dashboard() {
                             <div className="flex-1" />
                             
                             {/* Footer Actions */}
-                            <div className="flex items-center justify-end gap-3 pt-2">
-                                <Button variant="ghost" onClick={() => addLog("info", "Test trigger sent")} className="text-muted-foreground hover:text-primary">
-                                    <PlayCircle className="w-4 h-4 mr-2" /> Test Action
-                                </Button>
-                                <Button onClick={handleSaveConfig} disabled={isSaving} className="min-w-[140px] shadow-lg shadow-primary/20 hover:shadow-primary/30">
-                                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                                    {isSaving ? "Saving..." : "Save Config"}
-                                </Button>
+                            <div className="flex items-center justify-between pt-2">
+                                <div className="flex items-center gap-2">
+                                    {selectedDevice.status === "configured" && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button variant="ghost" size="sm" onClick={handleResetConfig} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                                                    <Unlink className="w-4 h-4 mr-2" />
+                                                    Reset Mapping
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Unbind current configuration</TooltipContent>
+                                        </Tooltip>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Button variant="ghost" onClick={() => addLog("info", "Test trigger sent")} className="text-muted-foreground hover:text-primary">
+                                        <PlayCircle className="w-4 h-4 mr-2" /> Test Action
+                                    </Button>
+                                    <Button onClick={handleSaveConfig} disabled={isSaving} className="min-w-[140px] shadow-lg shadow-primary/20 hover:shadow-primary/30">
+                                        {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                        {isSaving ? "Saving..." : "Save Config"}
+                                    </Button>
+                                </div>
                             </div>
                         </CardContent>
                         </Card>
