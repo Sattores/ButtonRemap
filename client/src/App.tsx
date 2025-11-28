@@ -11,8 +11,7 @@ import State2Configured from "@/pages/state2_configured";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={State2Configured} />
-      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/" component={Dashboard} />
       <Route path="/state1" component={State1NoMapping} />
       <Route path="/state2" component={State2Configured} />
       <Route component={NotFound} />
