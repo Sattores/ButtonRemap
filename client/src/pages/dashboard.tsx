@@ -49,7 +49,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 
 import bgImage from "@assets/generated_images/minimalist_abstract_geometric_shapes_in_soft_white_and_light_gray.png";
-import appIcon from "@assets/generated_images/neumorphic_white_usb_button_icon.png";
+import appIcon from "@assets/generated_images/flat_minimalist_usb_icon.png";
 
 // --- Types ---
 interface Device {
