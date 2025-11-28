@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, 
@@ -43,79 +43,52 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 
 import bgImage from "@assets/generated_images/minimalist_abstract_geometric_shapes_in_soft_white_and_light_gray.png";
-// import appIcon from "@assets/generated_images/flat_minimalist_usb_icon.png";
 
-// --- Types ---
-interface Device {
-  id: string;
-  name: string;
-  vid: string;
-  pid: string;
-  interface: number;
-  totalInterfaces: number;
-  status: "connected" | "disconnected" | "configured";
-  lastActive?: Date;
-}
+import TauriBridge from "@/lib/tauri-bridge";
+import type { HidDevice, LogEntry, TriggerType, ActionConfig, DeviceBinding } from "../../../shared/types";
+import { DEFAULT_PRESETS } from "../../../shared/presets";
+import { IPC_EVENTS } from "../../../shared/ipc";
 
-interface LogEntry {
-  id: string;
-  timestamp: Date;
-  type: "info" | "success" | "error";
-  message: string;
-}
+// Icon mapping for presets
+const ICON_MAP: Record<string, React.ReactNode> = {
+  Mic: <Mic className="w-4 h-4 text-primary" />,
+  Sparkles: <Sparkles className="w-4 h-4 text-amber-500" />,
+  Bot: <Bot className="w-4 h-4 text-emerald-500" />,
+  MicOff: <MicOff className="w-4 h-4 text-red-500" />,
+  Camera: <Camera className="w-4 h-4" />,
+  Terminal: <Terminal className="w-4 h-4" />,
+  Calculator: <Calculator className="w-4 h-4" />,
+  Lock: <Lock className="w-4 h-4" />,
+  VolumeX: <VolumeX className="w-4 h-4" />,
+  Power: <Power className="w-4 h-4 text-red-500" />,
+};
 
-interface Config {
+// Local UI state for config form
+interface ConfigForm {
   appPath: string;
   appArgs: string;
-  actionType: "single-press" | "double-press" | "long-press";
+  triggerType: TriggerType;
 }
 
-// --- Mock Data ---
-const MOCK_DEVICES: Device[] = [
-  { id: "1", name: "Macro Pad RGB", vid: "1A2B", pid: "3C4D", interface: 0, totalInterfaces: 1, status: "configured", lastActive: new Date() },
-  { id: "2", name: "Generic USB Button", vid: "05F3", pid: "0001", interface: 0, totalInterfaces: 2, status: "connected" },
-  { id: "3", name: "Stream Deck Mini", vid: "0FD9", pid: "0063", interface: 1, totalInterfaces: 2, status: "disconnected" },
-];
-
-const PRESETS = [
-  { category: "AI & Voice Actions", items: [
-    { name: "Voice Input (Whisper)", icon: <Mic className="w-4 h-4 text-primary" />, path: "python", args: "scripts/whisper_input.py" },
-    { name: "Ask Selection (LLM)", icon: <Sparkles className="w-4 h-4 text-amber-500" />, path: "scripts/ask_llm.bat", args: "--clipboard" },
-    { name: "Toggle ChatGPT Voice", icon: <Bot className="w-4 h-4 text-emerald-500" />, path: "C:\\Apps\\ChatGPT\\ChatGPT.exe", args: "--voice-mode" },
-    { name: "Mute Microphone", icon: <MicOff className="w-4 h-4 text-red-500" />, path: "nircmd.exe", args: "mutesysvolume 2 microphone" },
-  ]},
-  { category: "Productivity", items: [
-    { name: "Screenshot Area", icon: <Camera className="w-4 h-4" />, path: "snippingtool.exe", args: "/clip" },
-    { name: "Open Terminal", icon: <Terminal className="w-4 h-4" />, path: "wt.exe", args: "" },
-    { name: "Calculator", icon: <Calculator className="w-4 h-4" />, path: "calc.exe", args: "" },
-  ]},
-  { category: "System Controls", items: [
-    { name: "Lock Workstation", icon: <Lock className="w-4 h-4" />, path: "rundll32.exe", args: "user32.dll,LockWorkStation" },
-    { name: "Mute System Audio", icon: <VolumeX className="w-4 h-4" />, path: "nircmd.exe", args: "mutesysvolume 2" },
-    { name: "Emergency Stop", icon: <Power className="w-4 h-4 text-red-500" />, path: "shutdown.exe", args: "/s /t 0" },
-  ]}
-];
-
 export default function Dashboard() {
-  const [devices, setDevices] = useState<Device[]>(MOCK_DEVICES);
+  // State
+  const [devices, setDevices] = useState<HidDevice[]>([]);
+  const [bindings, setBindings] = useState<DeviceBinding[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [logs, setLogs] = useState<LogEntry[]>([
-    { id: "1", timestamp: new Date(Date.now() - 10000), type: "info", message: "Application started" },
-    { id: "2", timestamp: new Date(Date.now() - 5000), type: "success", message: "HID Service initialized" },
-  ]);
-  const [config, setConfig] = useState<Config>({
+  const [isLoading, setIsLoading] = useState(true);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [config, setConfig] = useState<ConfigForm>({
     appPath: "",
     appArgs: "",
-    actionType: "single-press",
+    triggerType: "single-press",
   });
   const [isAutoScroll, setIsAutoScroll] = useState(true);
   const { toast } = useToast();
@@ -124,108 +97,232 @@ export default function Dashboard() {
   
   const filteredDevices = devices.filter(device => 
     device.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    device.vid.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    device.pid.toLowerCase().includes(searchQuery.toLowerCase())
+    device.vendorId.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    device.productId.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Load initial data
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [devicesResult, bindingsResult, logsResult] = await Promise.all([
+          TauriBridge.listDevices(),
+          TauriBridge.getAllBindings(),
+          TauriBridge.getLogs(50),
+        ]);
+
+        if (devicesResult.success && devicesResult.data) {
+          setDevices(devicesResult.data);
+        }
+        if (bindingsResult.success && bindingsResult.data) {
+          setBindings(bindingsResult.data);
+        }
+        if (logsResult.success && logsResult.data) {
+          setLogs(logsResult.data);
+        }
+      } catch (error) {
+        console.error("Failed to load data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    // Subscribe to log events
+    const unsubscribe = TauriBridge.on(IPC_EVENTS.LOG_ENTRY, (entry: LogEntry) => {
+      setLogs(prev => [entry, ...prev].slice(0, 50));
+    });
+
+    // Subscribe to monitoring detection
+    const unsubMonitor = TauriBridge.on(IPC_EVENTS.MONITORING_DETECTED, (data: { device: HidDevice }) => {
+      setIsMonitoring(false);
+      handleSelectDevice(data.device.id);
+      toast({ title: "Device Detected!", description: `${data.device.name} pressed` });
+    });
+
+    return () => {
+      unsubscribe();
+      unsubMonitor();
+    };
+  }, []);
 
   // --- Handlers ---
 
-  const handleRefresh = () => {
-    addLog("info", "Refreshing device list...");
-    setDevices(prev => prev.map(d => ({ ...d, status: d.id === '3' ? 'disconnected' : d.status }))); // Reset mock state
-    setTimeout(() => {
-      addLog("success", "Found 3 HID devices");
-      toast({ title: "Refreshed", description: "Device list updated" });
-    }, 800);
-  };
+  const addLog = useCallback((level: LogEntry["level"], message: string, source?: string) => {
+    TauriBridge.addLog(level, message, source);
+  }, []);
 
-  const toggleMonitoring = () => {
-    setIsMonitoring(!isMonitoring);
-    if (!isMonitoring) {
-      addLog("info", "Started 'Find by Press' monitoring");
-      // Mock finding a device after 3 seconds
-      setTimeout(() => {
-        if (Math.random() > 0.5) { // 50% chance to auto-find for demo
-             toast({ title: "Device Detected!", description: "Generic USB Button pressed" });
-             handleSelectDevice("2");
-             setIsMonitoring(false);
-        }
-      }, 3000);
+  const handleRefresh = async () => {
+    addLog("info", "Refreshing device list...", "System");
+    
+    const result = await TauriBridge.refreshDevices();
+    
+    if (result.success && result.data) {
+      setDevices(result.data);
+      addLog("success", `Found ${result.data.length} HID devices`, "HID");
+      toast({ title: "Refreshed", description: "Device list updated" });
     } else {
-      addLog("info", "Stopped monitoring");
+      addLog("error", "Failed to refresh devices", "HID");
+      toast({ title: "Error", description: "Failed to refresh devices", variant: "destructive" });
     }
   };
 
-  const addLog = (type: LogEntry["type"], message: string) => {
-    setLogs(prev => [{
-      id: Math.random().toString(36).substr(2, 9),
-      timestamp: new Date(),
-      type,
-      message
-    }, ...prev].slice(0, 50));
+  const toggleMonitoring = async () => {
+    if (!isMonitoring) {
+      setIsMonitoring(true);
+      addLog("info", "Started 'Find by Press' monitoring", "HID");
+      await TauriBridge.startMonitoring();
+    } else {
+      setIsMonitoring(false);
+      addLog("info", "Stopped monitoring", "HID");
+      await TauriBridge.stopMonitoring();
+    }
   };
 
-  const handleSaveConfig = () => {
+  const handleSaveConfig = async () => {
     if (!selectedDevice) return;
     setIsSaving(true);
     
-    // Simulate API call
-    setTimeout(() => {
-        addLog("success", `Configuration saved for ${selectedDevice.vid}:${selectedDevice.pid}`);
-        toast({ title: "Saved", description: "Button configuration updated successfully" });
+    try {
+      const action: ActionConfig = {
+        type: "launch-app",
+        executablePath: config.appPath,
+        arguments: config.appArgs,
+      };
+
+      const bindingData = {
+        deviceId: selectedDevice.id,
+        vendorId: selectedDevice.vendorId,
+        productId: selectedDevice.productId,
+        triggerType: config.triggerType,
+        action,
+        enabled: true,
+      };
+
+      const result = await TauriBridge.saveBinding(bindingData);
+      
+      if (result.success && result.data) {
+        setBindings(prev => {
+          const existing = prev.findIndex(b => b.deviceId === selectedDevice.id);
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = result.data!;
+            return updated;
+          }
+          return [...prev, result.data!];
+        });
         
         setDevices(prev => prev.map(d => 
-          d.id === selectedDeviceId ? { ...d, status: "configured" } : d
+          d.id === selectedDevice.id ? { ...d, status: "configured" } : d
         ));
-        setIsSaving(false);
-    }, 800);
+        
+        addLog("success", `Configuration saved for ${selectedDevice.vendorId}:${selectedDevice.productId}`, "Config");
+        toast({ title: "Saved", description: "Button configuration updated successfully" });
+      }
+    } catch (error) {
+      addLog("error", "Failed to save configuration", "Config");
+      toast({ title: "Error", description: "Failed to save configuration", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSelectDevice = (id: string) => {
+  const handleSelectDevice = useCallback(async (id: string) => {
     setSelectedDeviceId(id);
     const device = devices.find(d => d.id === id);
     
-    if (device?.status === "configured") {
+    if (!device) return;
+    
+    // Load existing binding for this device
+    const bindingResult = await TauriBridge.getBinding(id);
+    
+    if (bindingResult.success && bindingResult.data) {
+      const binding = bindingResult.data;
       setConfig({
-        appPath: "C:\\Program Files\\Tools\\MyScript.bat",
-        appArgs: "--silent",
-        actionType: "single-press"
+        appPath: binding.action.executablePath,
+        appArgs: binding.action.arguments,
+        triggerType: binding.triggerType,
       });
     } else {
-      setConfig({ appPath: "", appArgs: "", actionType: "single-press" });
+      setConfig({ appPath: "", appArgs: "", triggerType: "single-press" });
     }
     
-    if (device?.status === "disconnected") {
-        addLog("error", `Could not connect to ${device.name}: Device disconnected`);
+    if (device.status === "disconnected") {
+      addLog("error", `Could not connect to ${device.name}: Device disconnected`, "HID");
     } else {
-        addLog("info", `Selected device: ${device?.name} (${device?.vid}:${device?.pid})`);
+      addLog("info", `Selected device: ${device.name} (${device.vendorId}:${device.productId})`, "HID");
     }
-  };
+  }, [devices, addLog]);
 
-  const handleResetConfig = () => {
+  const handleResetConfig = async () => {
     if (!selectedDevice) return;
     
-    setConfig({ appPath: "", appArgs: "", actionType: "single-press" });
+    const binding = bindings.find(b => b.deviceId === selectedDevice.id);
+    if (binding) {
+      await TauriBridge.deleteBinding(binding.id);
+      setBindings(prev => prev.filter(b => b.id !== binding.id));
+    }
     
-    // Simulate API call to clear
-    addLog("info", `Configuration cleared for ${selectedDevice.vid}:${selectedDevice.pid}`);
-    toast({ title: "Reset", description: "Button configuration cleared" });
+    setConfig({ appPath: "", appArgs: "", triggerType: "single-press" });
     
     setDevices(prev => prev.map(d => 
       d.id === selectedDeviceId ? { ...d, status: "connected" } : d
     ));
+    
+    addLog("info", `Configuration cleared for ${selectedDevice.vendorId}:${selectedDevice.productId}`, "Config");
+    toast({ title: "Reset", description: "Button configuration cleared" });
   };
 
-  const applyPreset = (preset: any) => {
+  const applyPreset = (preset: typeof DEFAULT_PRESETS[0]["items"][0]) => {
     if (selectedDevice?.status === "disconnected") return;
     
     setConfig(prev => ({
       ...prev,
-      appPath: preset.path,
-      appArgs: preset.args
+      appPath: preset.action.executablePath,
+      appArgs: preset.action.arguments,
     }));
     toast({ title: "Preset Applied", description: `${preset.name} settings loaded` });
   };
+
+  const handleTestAction = async () => {
+    if (!config.appPath) return;
+    
+    await TauriBridge.testAction({
+      type: "launch-app",
+      executablePath: config.appPath,
+      arguments: config.appArgs,
+    });
+    
+    addLog("info", "Test trigger sent", "Test");
+  };
+
+  const handleClearLogs = async () => {
+    await TauriBridge.clearLogs();
+    setLogs([]);
+  };
+
+  const handleExportLogs = () => {
+    const text = logs.map(l => `[${l.timestamp}] ${l.level.toUpperCase()}: ${l.message}`).join('\n');
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied", description: "Logs copied to clipboard" });
+  };
+
+  const handleSaveLogs = () => {
+    toast({ title: "Logs Saved", description: "Saved to logs.txt" });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden font-sans text-foreground">
@@ -256,6 +353,7 @@ export default function Dashboard() {
                 className="pl-9 bg-background/50" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                data-testid="input-search-devices"
               />
             </div>
             <div className="flex gap-2">
@@ -270,11 +368,12 @@ export default function Dashboard() {
                   }
                 `}
                 onClick={toggleMonitoring}
+                data-testid="button-find-device"
                 >
                 {isMonitoring ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-2 fill-white/20" />}
                 {isMonitoring ? "Detecting..." : "Find Button"}
                 </Button>
-                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground" onClick={handleRefresh}>
+                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground" onClick={handleRefresh} data-testid="button-refresh-devices">
                     <RefreshCw className="w-4 h-4" />
                 </Button>
             </div>
@@ -298,6 +397,7 @@ export default function Dashboard() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   onClick={() => handleSelectDevice(device.id)}
+                  data-testid={`device-item-${device.id}`}
                 >
                   <div 
                     className={`
@@ -325,7 +425,7 @@ export default function Dashboard() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
-                        <span className="bg-sidebar-accent px-1 rounded text-foreground/70">{device.vid}:{device.pid}</span>
+                        <span className="bg-sidebar-accent px-1 rounded text-foreground/70">{device.vendorId}:{device.productId}</span>
                         {device.status === 'disconnected' && <span className="text-destructive font-semibold">OFFLINE</span>}
                       </div>
                     </div>
@@ -367,7 +467,7 @@ export default function Dashboard() {
                         <p className="text-muted-foreground mb-6">
                             We are listening for input signals. Press the hardware button you want to configure.
                         </p>
-                        <Button variant="outline" onClick={toggleMonitoring}>Cancel Detection</Button>
+                        <Button variant="outline" onClick={toggleMonitoring} data-testid="button-cancel-monitoring">Cancel Detection</Button>
                     </div>
                 </motion.div>
             )}
@@ -392,6 +492,7 @@ export default function Dashboard() {
                         initial={{ opacity: 0, x: -10 }} 
                         animate={{ opacity: 1, x: 0 }}
                         className="text-3xl font-bold tracking-tight text-foreground"
+                        data-testid="text-device-name"
                         >
                         {selectedDevice.name}
                         </motion.h2>
@@ -402,10 +503,10 @@ export default function Dashboard() {
                     
                     <div className="flex items-center gap-2 mt-2">
                       <Badge variant="outline" className="font-mono text-xs bg-background/50 backdrop-blur">
-                        VID: {selectedDevice.vid}
+                        VID: {selectedDevice.vendorId}
                       </Badge>
                       <Badge variant="outline" className="font-mono text-xs bg-background/50 backdrop-blur">
-                        PID: {selectedDevice.pid}
+                        PID: {selectedDevice.productId}
                       </Badge>
                       <span className="text-xs text-muted-foreground ml-2">Connected via USB HID</span>
                     </div>
@@ -439,26 +540,26 @@ export default function Dashboard() {
                             <div className="space-y-2">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Preset</Label>
                                 <Select onValueChange={(val) => {
-                                    const allPresets = PRESETS.flatMap(p => p.items);
-                                    const selected = allPresets.find(p => p.name === val);
+                                    const allPresets = DEFAULT_PRESETS.flatMap(p => p.items);
+                                    const selected = allPresets.find(p => p.id === val);
                                     if (selected) applyPreset(selected);
                                 }}>
-                                    <SelectTrigger className="h-12 bg-secondary/30 border-border/50">
+                                    <SelectTrigger className="h-12 bg-secondary/30 border-border/50" data-testid="select-preset">
                                         <SelectValue placeholder="Select a preset..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {PRESETS.map((category, i) => (
-                                            <React.Fragment key={i}>
-                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{category.category}</div>
+                                        {DEFAULT_PRESETS.map((category, i) => (
+                                            <React.Fragment key={category.id}>
+                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{category.name}</div>
                                                 {category.items.map(item => (
-                                                    <SelectItem key={item.name} value={item.name}>
+                                                    <SelectItem key={item.id} value={item.id}>
                                                         <div className="flex items-center gap-2">
-                                                            {item.icon}
+                                                            {ICON_MAP[item.icon] || <Settings className="w-4 h-4" />}
                                                             <span>{item.name}</span>
                                                         </div>
                                                     </SelectItem>
                                                 ))}
-                                                {i < PRESETS.length - 1 && <Separator className="my-1" />}
+                                                {i < DEFAULT_PRESETS.length - 1 && <Separator className="my-1" />}
                                             </React.Fragment>
                                         ))}
                                     </SelectContent>
@@ -475,8 +576,9 @@ export default function Dashboard() {
                                 value={config.appPath}
                                 onChange={(e) => setConfig({...config, appPath: e.target.value})}
                                 className="font-mono text-sm bg-background/50 h-10"
+                                data-testid="input-app-path"
                                 />
-                                <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0">
+                                <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0" data-testid="button-browse-file">
                                     <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                             </div>
@@ -491,6 +593,7 @@ export default function Dashboard() {
                                 value={config.appArgs}
                                 onChange={(e) => setConfig({...config, appArgs: e.target.value})}
                                 className="font-mono text-sm bg-background/50 h-10"
+                                data-testid="input-app-args"
                             />
                             </div>
 
@@ -507,16 +610,17 @@ export default function Dashboard() {
                                 ].map((type) => (
                                 <div 
                                     key={type.id}
-                                    onClick={() => setConfig({...config, actionType: type.id as any})}
+                                    onClick={() => setConfig({...config, triggerType: type.id as TriggerType})}
                                     className={`
                                     cursor-pointer rounded-xl border-2 p-3 flex flex-col items-center gap-2 transition-all relative overflow-hidden
-                                    ${config.actionType === type.id 
+                                    ${config.triggerType === type.id 
                                         ? "border-primary bg-primary/5 text-primary" 
                                         : "border-transparent bg-secondary/50 hover:bg-secondary hover:scale-[1.02]"
                                     }
                                     `}
+                                    data-testid={`trigger-${type.id}`}
                                 >
-                                    {config.actionType === type.id && (
+                                    {config.triggerType === type.id && (
                                         <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full" />
                                     )}
                                     <type.icon className="w-5 h-5 mb-1" />
@@ -536,7 +640,7 @@ export default function Dashboard() {
                                     {selectedDevice.status === "configured" && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <Button variant="ghost" size="sm" onClick={handleResetConfig} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                                                <Button variant="ghost" size="sm" onClick={handleResetConfig} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" data-testid="button-reset-mapping">
                                                     <Unlink className="w-4 h-4 mr-2" />
                                                     Reset Mapping
                                                 </Button>
@@ -546,10 +650,10 @@ export default function Dashboard() {
                                     )}
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <Button variant="ghost" onClick={() => addLog("info", "Test trigger sent")} className="text-muted-foreground hover:text-primary">
+                                    <Button variant="ghost" onClick={handleTestAction} className="text-muted-foreground hover:text-primary" data-testid="button-test-action">
                                         <PlayCircle className="w-4 h-4 mr-2" /> Test Action
                                     </Button>
-                                    <Button onClick={handleSaveConfig} disabled={isSaving} className="min-w-[140px] shadow-lg shadow-primary/20 hover:shadow-primary/30">
+                                    <Button onClick={handleSaveConfig} disabled={isSaving} className="min-w-[140px] shadow-lg shadow-primary/20 hover:shadow-primary/30" data-testid="button-save-config">
                                         {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                                         {isSaving ? "Saving..." : "Save Config"}
                                     </Button>
@@ -597,11 +701,7 @@ export default function Dashboard() {
               </div>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                      const text = logs.map(l => `[${l.timestamp.toISOString()}] ${l.type.toUpperCase()}: ${l.message}`).join('\n');
-                      // Mock save
-                      toast({ title: "Logs Saved", description: "Saved to logs.txt" });
-                  }}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSaveLogs} data-testid="button-save-logs">
                     <Download className="w-3 h-3" />
                   </Button>
                 </TooltipTrigger>
@@ -609,11 +709,7 @@ export default function Dashboard() {
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                      const text = logs.map(l => `[${l.timestamp.toISOString()}] ${l.type.toUpperCase()}: ${l.message}`).join('\n');
-                      navigator.clipboard.writeText(text);
-                      toast({ title: "Copied", description: "Logs copied to clipboard" });
-                  }}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportLogs} data-testid="button-copy-logs">
                     <Copy className="w-3 h-3" />
                   </Button>
                 </TooltipTrigger>
@@ -621,7 +717,7 @@ export default function Dashboard() {
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive" onClick={() => setLogs([])}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive" onClick={handleClearLogs} data-testid="button-clear-logs">
                     <Eraser className="w-3 h-3" />
                   </Button>
                 </TooltipTrigger>
@@ -634,14 +730,14 @@ export default function Dashboard() {
               {logs.map((log) => (
                 <div key={log.id} className="flex gap-3 hover:bg-slate-50 p-0.5 rounded px-2 group">
                   <span className="text-slate-400 select-none shrink-0 group-hover:text-slate-500 transition-colors">
-                    {log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}.
-                    <span className="text-[10px]">{log.timestamp.getMilliseconds().toString().padStart(3, '0')}</span>
+                    {new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}.
+                    <span className="text-[10px]">{new Date(log.timestamp).getMilliseconds().toString().padStart(3, '0')}</span>
                   </span>
                   <span className={`
                     uppercase tracking-wider text-[10px] font-bold w-16 shrink-0
-                    ${log.type === 'error' ? 'text-red-500' : log.type === 'success' ? 'text-green-600' : 'text-blue-500'}
+                    ${log.level === 'error' ? 'text-red-500' : log.level === 'success' ? 'text-green-600' : 'text-blue-500'}
                   `}>
-                    {log.type}
+                    {log.level}
                   </span>
                   <span className="text-slate-700">{log.message}</span>
                 </div>

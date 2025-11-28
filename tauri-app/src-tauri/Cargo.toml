@@ -1,0 +1,29 @@
+[package]
+name = "usb-configurator"
+version = "2.1.0"
+description = "USB Button Configurator - Map USB buttons to system actions"
+authors = ["USB Configurator Team"]
+license = "MIT"
+repository = "https://github.com/usb-configurator/usb-configurator"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["shell-open"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hidapi = "2.6"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.11"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
