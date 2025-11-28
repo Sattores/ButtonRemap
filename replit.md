@@ -6,7 +6,7 @@ A Windows 11 desktop application using Tauri that intercepts input from physical
 ## Current State
 - **Mode**: Full-stack development (Tauri-ready)
 - **Frontend**: Complete React UI with mock data support
-- **Backend**: Rust scaffold created with HID manager, config persistence, and IPC commands
+- **Backend**: Rust scaffold in `src-tauri/` with HID manager, config persistence, and IPC commands
 - **Status**: Ready for local Tauri build on Windows
 
 ## Architecture
@@ -17,7 +17,7 @@ A Windows 11 desktop application using Tauri that intercepts input from physical
 - `TauriBridge` abstraction layer for IPC
 - Fonts: Plus Jakarta Sans (UI) + JetBrains Mono (technical)
 
-### Backend Scaffold (tauri-app/src-tauri/)
+### Backend (src-tauri/)
 - Rust with Tauri 2.0
 - `hidapi` for USB HID device access
 - JSON-based config persistence
@@ -34,9 +34,9 @@ A Windows 11 desktop application using Tauri that intercepts input from physical
 | `client/src/pages/dashboard.tsx` | Main UI |
 | `client/src/lib/tauri-bridge.ts` | IPC abstraction |
 | `shared/types.ts` | Data models |
-| `tauri-app/src-tauri/src/main.rs` | Rust entry point |
-| `tauri-app/src-tauri/src/hid.rs` | USB HID manager |
-| `tauri-app/src-tauri/src/commands.rs` | IPC handlers |
+| `src-tauri/src/main.rs` | Rust entry point |
+| `src-tauri/src/hid.rs` | USB HID manager |
+| `src-tauri/src/commands.rs` | IPC handlers |
 
 ## User Preferences
 - Priority presets: AI/Voice actions (Whisper, LLM clipboard, ChatGPT voice, mic mute)
@@ -46,7 +46,16 @@ A Windows 11 desktop application using Tauri that intercepts input from physical
 ## Build Instructions
 See `BUILD_INSTRUCTIONS.md` for complete Windows build guide.
 
+Quick start:
+```powershell
+.\setup-tauri.ps1   # Windows
+./setup-tauri.sh    # Linux/Mac
+```
+
 ## Recent Changes
+- 2024-11: Moved src-tauri to project root for standard Tauri structure
+- 2024-11: Created setup scripts (PowerShell and Bash)
+- 2024-11: Updated BUILD_INSTRUCTIONS.md with complete workflow
 - 2024: Created Tauri project scaffold with full Rust backend stubs
 - 2024: Updated TauriBridge to avoid dynamic imports in development
 - 2024: Dashboard now uses TauriBridge for all operations
