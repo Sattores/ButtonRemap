@@ -23,7 +23,13 @@ import {
   Power,
   Globe,
   Loader2,
-  XCircle
+  XCircle,
+  Mic,
+  MicOff,
+  Sparkles,
+  MessageSquare,
+  Camera,
+  Bot
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,20 +77,21 @@ const MOCK_DEVICES: Device[] = [
 ];
 
 const PRESETS = [
-  { category: "Applications", items: [
-    { name: "Browser", icon: <Globe className="w-4 h-4" />, path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", args: "https://replit.com" },
-    { name: "Terminal", icon: <Terminal className="w-4 h-4" />, path: "C:\\Windows\\System32\\cmd.exe", args: "/k echo Hello World" },
-    { name: "Notepad", icon: <FileText className="w-4 h-4" />, path: "C:\\Windows\\System32\\notepad.exe", args: "" },
-    { name: "Calculator", icon: <Calculator className="w-4 h-4" />, path: "C:\\Windows\\System32\\calc.exe", args: "" },
+  { category: "AI & Voice Actions", items: [
+    { name: "Voice Input (Whisper)", icon: <Mic className="w-4 h-4 text-primary" />, path: "python", args: "scripts/whisper_input.py" },
+    { name: "Ask Selection (LLM)", icon: <Sparkles className="w-4 h-4 text-amber-500" />, path: "scripts/ask_llm.bat", args: "--clipboard" },
+    { name: "Toggle ChatGPT Voice", icon: <Bot className="w-4 h-4 text-emerald-500" />, path: "C:\\Apps\\ChatGPT\\ChatGPT.exe", args: "--voice-mode" },
+    { name: "Mute Microphone", icon: <MicOff className="w-4 h-4 text-red-500" />, path: "nircmd.exe", args: "mutesysvolume 2 microphone" },
   ]},
-  { category: "System", items: [
-    { name: "Lock Screen", icon: <Lock className="w-4 h-4" />, path: "C:\\Windows\\System32\\rundll32.exe", args: "user32.dll,LockWorkStation" },
-    { name: "Mute Volume", icon: <VolumeX className="w-4 h-4" />, path: "nircmd.exe", args: "mutesysvolume 2" },
-    { name: "Shutdown", icon: <Power className="w-4 h-4 text-red-500" />, path: "shutdown.exe", args: "/s /t 60" },
+  { category: "Productivity", items: [
+    { name: "Screenshot Area", icon: <Camera className="w-4 h-4" />, path: "snippingtool.exe", args: "/clip" },
+    { name: "Open Terminal", icon: <Terminal className="w-4 h-4" />, path: "wt.exe", args: "" },
+    { name: "Calculator", icon: <Calculator className="w-4 h-4" />, path: "calc.exe", args: "" },
   ]},
-  { category: "AI & Scripts", items: [
-    { name: "AI Assistant", icon: <Zap className="w-4 h-4" />, path: "C:\\Program Files\\AI\\assistant.exe", args: "--listen" },
-    { name: "Python Script", icon: <FileText className="w-4 h-4" />, path: "python.exe", args: "script.py" },
+  { category: "System Controls", items: [
+    { name: "Lock Workstation", icon: <Lock className="w-4 h-4" />, path: "rundll32.exe", args: "user32.dll,LockWorkStation" },
+    { name: "Mute System Audio", icon: <VolumeX className="w-4 h-4" />, path: "nircmd.exe", args: "mutesysvolume 2" },
+    { name: "Emergency Stop", icon: <Power className="w-4 h-4 text-red-500" />, path: "shutdown.exe", args: "/s /t 0" },
   ]}
 ];
 
