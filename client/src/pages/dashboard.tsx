@@ -28,7 +28,13 @@ import {
   Pause,
   PlayCircle,
   MoreHorizontal,
-  Unlink
+  Unlink,
+  Mic,
+  MicOff,
+  Sparkles,
+  MessageSquare,
+  Camera,
+  Bot
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
