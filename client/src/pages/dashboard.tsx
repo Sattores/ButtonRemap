@@ -227,15 +227,21 @@ export default function Dashboard() {
             </div>
             <div className="flex gap-2">
                 <Button 
-                variant={isMonitoring ? "default" : "outline"} 
+                variant="default"
                 size="sm" 
-                className={`flex-1 transition-all duration-300 ${isMonitoring ? "animate-pulse ring-2 ring-primary/20 border-primary" : ""}`}
+                className={`
+                  flex-1 transition-all duration-300 shadow-md hover:shadow-lg border-0
+                  ${isMonitoring 
+                    ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse ring-2 ring-amber-200" 
+                    : "bg-gradient-to-r from-violet-600 via-primary to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white"
+                  }
+                `}
                 onClick={toggleMonitoring}
                 >
-                {isMonitoring ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-2" />}
+                {isMonitoring ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-2 fill-white/20" />}
                 {isMonitoring ? "Detecting..." : "Find Button"}
                 </Button>
-                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={handleRefresh}>
+                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground" onClick={handleRefresh}>
                     <RefreshCw className="w-4 h-4" />
                 </Button>
             </div>
