@@ -49,6 +49,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 
 import bgImage from "@assets/generated_images/minimalist_abstract_geometric_shapes_in_soft_white_and_light_gray.png";
+import appIcon from "@assets/generated_images/glassmorphism_usb_symbol_icon.png";
 
 // --- Types ---
 interface Device {
@@ -233,8 +234,8 @@ export default function Dashboard() {
       <div className="w-80 border-r border-sidebar-border bg-sidebar flex flex-col shadow-xl z-20">
         <div className="p-6 flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-              <Usb className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-sm border border-border/20">
+              <img src={appIcon} alt="App Icon" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="font-bold text-lg leading-tight tracking-tight">USB Configurator</h1>
