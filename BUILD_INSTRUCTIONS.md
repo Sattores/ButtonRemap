@@ -1,97 +1,47 @@
-# Build Instructions for Windows 11 (Tauri)
+# USB Configurator - Build Instructions
 
-This project is designed to be compiled into a native Windows 11 application using **Tauri**. Tauri combines this React frontend with a lightweight Rust backend for high performance and native USB access.
+## Quick Start (Windows)
 
-## Overview
+### Prerequisites
+1. **Node.js 20+** — [nodejs.org](https://nodejs.org/)
+2. **Rust** — [rustup.rs](https://rustup.rs/)
+3. **Build Tools for Visual Studio 2022** — [visualstudio.microsoft.com](https://visualstudio.microsoft.com/downloads/)
+   - Select "Desktop development with C++"
 
-The project has two main parts:
-1. **Frontend** - React + TypeScript + Vite (in `client/`)
-2. **Backend** - Rust + Tauri (scaffold in `tauri-app/src-tauri/`)
-
-In development mode (Replit), the app uses mock data. In production (Tauri build), it uses real USB HID device access.
-
-## Prerequisites
-
-### Required Software
-
-1. **Node.js 20+** - [nodejs.org](https://nodejs.org/)
-2. **Rust (stable)** - [rustup.rs](https://rustup.rs/)
-3. **Build Tools for Visual Studio 2022/2026** - Required for Rust on Windows
-   - Download from [Visual Studio Downloads](https://visualstudio.microsoft.com/downloads/)
-   - Select "Desktop development with C++" workload
-4. **WebView2** - Usually pre-installed on Windows 10/11
-
-### Verify Installation
+### One-Command Setup
 
 ```powershell
-node --version   # Should be 20.x or higher
-npm --version    # Should be 10.x or higher
-rustc --version  # Should be 1.70.0 or higher
-cargo --version
-```
-
-## Build Steps
-
-### Step 1: Clone and Setup
-
-```bash
-# Clone the repository (if not already done)
-git clone <repository-url>
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/usb-configurator.git
 cd usb-configurator
 
-# Install frontend dependencies
+# Run the setup script
+.\setup-tauri.ps1
+```
+
+Or manually:
+
+```powershell
+# 1. Replace config files with Tauri versions
+Copy-Item package.tauri.json package.json -Force
+Copy-Item vite.config.tauri.ts vite.config.ts -Force
+
+# 2. Install dependencies
 npm install
-```
 
-### Step 2: Initialize Tauri
-
-The `tauri-app/` folder contains the pre-built Rust scaffold. Copy it to your project or use the structure as-is.
-
-```bash
-# Install Tauri CLI
-npm install -D @tauri-apps/cli@latest
-
-# Copy Tauri scaffold to project root (if not already structured)
-cp -r tauri-app/* ./
-```
-
-### Step 3: Install Rust Dependencies
-
-```bash
+# 3. Build Rust backend
 cd src-tauri
 cargo build
 cd ..
+
+# 4. Run in development mode
+npm run tauri:dev
+
+# 5. Build for production
+npm run tauri:build
 ```
 
-This will download and compile all Rust dependencies including:
-- `hidapi` - USB HID device access
-- `serde` - JSON serialization
-- `tokio` - Async runtime
-- `tauri` - Application framework
-
-### Step 4: Development Mode
-
-Run the Tauri development server (frontend + backend):
-
-```bash
-npm run tauri dev
-```
-
-This will:
-- Start Vite dev server on port 5000
-- Compile and launch the Rust backend
-- Open the native window with dev tools
-
-### Step 5: Build for Production
-
-```bash
-npm run tauri build
-```
-
-Output files will be in:
-- `src-tauri/target/release/bundle/msi/` - Windows MSI installer
-- `src-tauri/target/release/bundle/nsis/` - NSIS installer
-- `src-tauri/target/release/usb-configurator.exe` - Standalone executable
+---
 
 ## Project Structure
 
@@ -99,81 +49,121 @@ Output files will be in:
 usb-configurator/
 ├── client/                 # React frontend
 │   ├── src/
-│   │   ├── pages/          # Dashboard and other pages
-│   │   ├── components/     # UI components (shadcn/ui)
+│   │   ├── pages/          # Dashboard UI
+│   │   ├── components/     # shadcn/ui components
 │   │   ├── lib/            # TauriBridge IPC layer
 │   │   └── hooks/          # React hooks
 │   └── index.html
-├── shared/                 # Shared types (TS & Rust reference)
-│   ├── types.ts            # TypeScript interfaces
-│   ├── ipc.ts              # IPC command/event names
-│   └── presets.ts          # Default action presets
-├── src-tauri/              # Rust backend (from tauri-app/)
+├── shared/                 # Shared TypeScript types
+│   ├── types.ts            # Data models
+│   ├── ipc.ts              # IPC command names
+│   └── presets.ts          # Action presets
+├── src-tauri/              # Rust backend
 │   ├── src/
-│   │   ├── main.rs         # Application entry point
-│   │   ├── commands.rs     # Tauri IPC handlers
-│   │   ├── hid.rs          # USB HID device manager
+│   │   ├── main.rs         # Entry point
+│   │   ├── commands.rs     # IPC handlers
+│   │   ├── hid.rs          # USB HID manager
 │   │   ├── config.rs       # Config persistence
-│   │   └── types.rs        # Rust type definitions
+│   │   └── types.rs        # Rust types
 │   ├── Cargo.toml          # Rust dependencies
-│   └── tauri.conf.json     # Tauri configuration
-├── package.json            # Node.js dependencies
-└── BUILD_INSTRUCTIONS.md   # This file
+│   └── tauri.conf.json     # Tauri config
+├── package.tauri.json      # Package.json for Tauri build
+├── vite.config.tauri.ts    # Vite config for Tauri
+├── setup-tauri.ps1         # Windows setup script
+└── setup-tauri.sh          # Linux/Mac setup script
 ```
 
-## IPC Communication
+---
 
-The `TauriBridge` (in `client/src/lib/tauri-bridge.ts`) provides a unified API that:
-- **Development**: Returns mock data for testing UI
-- **Production**: Calls Rust backend via `window.__TAURI__.invoke()`
+## Build Output
 
-### Available Commands
+After running `npm run tauri:build`:
 
-| Command | Description |
-|---------|-------------|
-| `list_devices` | Get all connected USB HID devices |
-| `refresh_devices` | Refresh device list |
-| `start_monitoring` | Start "Find by Press" detection |
-| `stop_monitoring` | Stop monitoring mode |
-| `save_binding` | Save device → action mapping |
-| `delete_binding` | Remove a binding |
-| `test_action` | Execute an action for testing |
-| `get_settings` | Get app settings |
-| `save_settings` | Save app settings |
+```
+src-tauri/target/release/
+├── usb-configurator.exe           # Standalone executable
+└── bundle/
+    ├── msi/
+    │   └── USB Configurator_2.1.0_x64.msi
+    └── nsis/
+        └── USB Configurator_2.1.0_x64-setup.exe
+```
+
+---
+
+## Development Workflow
+
+### Development Mode
+```powershell
+npm run tauri:dev
+```
+- Hot-reload for frontend changes
+- Rust recompiles on backend changes
+- DevTools available (F12)
+
+### Production Build
+```powershell
+npm run tauri:build
+```
+- Optimized frontend bundle
+- Release Rust binary
+- Windows installer (.msi)
+
+---
+
+## Configuration Files
+
+### package.tauri.json → package.json
+Contains Tauri-specific scripts and cleaned dependencies (no server-side packages).
+
+### vite.config.tauri.ts → vite.config.ts
+Vite configuration optimized for Tauri:
+- Correct paths for client/dist
+- Port 5000 for Tauri dev server
+- Environment variable prefixes
+
+### src-tauri/tauri.conf.json
+Tauri application configuration:
+- Window size and title
+- Build commands
+- Bundle settings
+- App icons
+
+---
 
 ## Troubleshooting
 
 ### "hidapi" Compilation Fails
-
-On Windows, you may need to install additional dependencies:
-
 ```powershell
-# Install LLVM (required by some Rust crates)
 winget install LLVM.LLVM
 ```
 
 ### WebView2 Not Found
+Download from [Microsoft WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 
-If you get WebView2 errors, install it manually:
-- Download from [Microsoft WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
+### Rust Build Errors
+```powershell
+rustup update
+cd src-tauri
+cargo clean
+cargo build
+```
 
-### USB Device Access Denied
+### Port 5000 Already in Use
+Edit `vite.config.ts` and `src-tauri/tauri.conf.json` to use a different port.
 
-The application needs to run with appropriate permissions to access USB HID devices. On first run, Windows may prompt for USB device access.
+---
 
-## Why Tauri?
+## App Icons
 
-| Feature | Tauri | Electron |
-|---------|-------|----------|
-| Bundle Size | ~5-10 MB | ~100+ MB |
-| Memory Usage | ~20-50 MB | ~150+ MB |
-| Startup Time | <1 second | 2-5 seconds |
-| Security | Rust backend sandboxing | Full Node.js access |
-| USB Access | Native via hidapi | Requires native modules |
+Place your icons in `src-tauri/icons/`:
+- `32x32.png`
+- `128x128.png`
+- `128x128@2x.png`
+- `icon.ico` (Windows)
+- `icon.icns` (Mac)
 
-## Next Steps
-
-1. Add your app icons to `src-tauri/icons/`
-2. Configure signing in `tauri.conf.json` for distribution
-3. Set up auto-updates with Tauri's update plugin
-4. Add Windows registry entries for "Start with Windows" feature
+Generate from a single 1024x1024 image using:
+```powershell
+npm run tauri icon path/to/icon.png
+```

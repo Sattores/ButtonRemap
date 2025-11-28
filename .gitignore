@@ -4,3 +4,25 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Tauri
+src-tauri/target
+src-tauri/Cargo.lock
+src-tauri/WixTools
+src-tauri/icons/*.ico
+src-tauri/icons/*.icns
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
