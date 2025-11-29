@@ -174,8 +174,9 @@ export default function Dashboard() {
         }
       });
 
-      // Select the detected device
-      console.log(`📌 [Dashboard] Selecting device ${data.device.id}`);
+      // Auto-select the detected device
+      console.log(`📌 [Dashboard] Auto-selecting device ${data.device.id}`);
+      setSelectedDeviceId(data.device.id);
       setTimeout(() => handleSelectDevice(data.device.id), 0);
 
       addLog("success", `Device found: ${data.device.name} (${data.device.vendorId}:${data.device.productId}, Interface ${data.device.interfaceNumber})`, "Monitor");
@@ -725,7 +726,7 @@ export default function Dashboard() {
                             {/* Footer Actions */}
                             <div className="flex items-center justify-between pt-2">
                                 <div className="flex items-center gap-2">
-                                    {selectedDevice && bindings.some(b => b.deviceId === selectedDevice.id) && (
+                                    {selectedDevice?.status === "configured" && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Button variant="ghost" size="sm" onClick={handleResetConfig} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" data-testid="button-reset-mapping">

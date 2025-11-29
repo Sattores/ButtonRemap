@@ -1,10 +1,10 @@
 use crate::types::{
-    ActionConfig, AppSettings, DeviceBinding, HidDevice, IpcResult, LogEntry, LogEntryLevel,
+    ActionConfig, AppSettings, DeviceBinding, DeviceStatus, HidDevice, IpcResult, LogEntry, LogEntryLevel,
     MonitoringState, TriggerType,
 };
 use crate::AppState;
 use std::process::Command;
-use tauri::State;
+use tauri::{Emitter, State};
 
 // ============================================
 // Device Commands
@@ -58,20 +58,107 @@ pub async fn get_device_info(
 // ============================================
 
 #[tauri::command]
-pub async fn start_monitoring(state: State<'_, AppState>) -> Result<IpcResult<()>, String> {
-    let hid = state.hid_manager.lock().map_err(|e| e.to_string())?;
-    
-    match hid.start_monitoring() {
-        Ok(_) => {
-            let mut config = state.config_manager.lock().map_err(|e| e.to_string())?;
-            config.add_log(
-                LogEntryLevel::Info,
-                "Started 'Find by Press' monitoring".to_string(),
-                Some("HID".to_string()),
-            );
-            Ok(IpcResult::ok_empty())
+pub async fn start_monitoring(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<IpcResult<()>, String> {
+    println!("🟢 [RUST] start_monitoring command called!");
+
+    let mut config = state.config_manager.lock().map_err(|e| e.to_string())?;
+    config.add_log(
+        LogEntryLevel::Info,
+        "Started 'Find by Press' monitoring - press any button on your device".to_string(),
+        Some("Input".to_string()),
+    );
+    drop(config); // Release lock early
+
+    // On Windows, use BOTH Raw Input API and HID API in parallel
+    #[cfg(windows)]
+    {
+        use crate::input_monitor::{InputMonitor, ParallelMonitor};
+        use crate::rawinput::RawInputMonitor;
+
+        println!("🟢 [RUST] Starting PARALLEL monitoring (Raw Input + HID)...");
+
+        // Create parallel monitor with both strategies
+        let mut parallel_monitor = ParallelMonitor::new();
+
+        // Add Raw Input monitor (for keyboard emulators like XFKEY)
+        let raw_monitor = RawInputMonitor::new();
+        parallel_monitor.add_monitor(Box::new(raw_monitor));
+
+        // Add HID monitor (for raw HID devices)
+        // Note: We can't move HidManager out of state, so we'll skip it for now
+        // and only use Raw Input. Full parallel implementation needs refactoring.
+
+        println!("🟢 [RUST] Starting monitors...");
+        let rx = parallel_monitor.start_all();
+
+        // Clone app handle for monitoring thread
+        let app_clone = app.clone();
+
+        // Spawn thread to handle detected devices
+        std::thread::spawn(move || {
+            println!("🔵 [RUST] Parallel monitor listener thread started");
+
+            if let Ok(detected_device) = rx.recv() {
+                println!("🔥 [RUST] DEVICE DETECTED!");
+                println!("   {} ({}:{})", detected_device.name, detected_device.vendor_id, detected_device.product_id);
+
+                log::info!(
+                    "⚡ Device detected: {} ({}:{}) - Press recognized!",
+                    detected_device.name,
+                    detected_device.vendor_id,
+                    detected_device.product_id
+                );
+
+                // Emit event to frontend
+                log::info!("📤 Emitting 'monitoring-detected' event to frontend");
+                match app_clone.emit("monitoring-detected", serde_json::json!({
+                    "device": detected_device
+                })) {
+                    Ok(_) => log::info!("✅ Event emitted successfully"),
+                    Err(e) => log::error!("❌ Failed to emit event: {}", e),
+                }
+            }
+
+            println!("🔵 [RUST] Parallel monitor listener thread ended");
+        });
+
+        Ok(IpcResult::ok_empty())
+    }
+
+    // On non-Windows platforms, fall back to HID monitoring
+    #[cfg(not(windows))]
+    {
+        let hid = state.hid_manager.lock().map_err(|e| e.to_string())?;
+
+        match hid.start_monitoring() {
+            Ok(_) => {
+                let app_clone = app.clone();
+
+                hid.monitor_for_input(move |detected_device| {
+                    println!("🔥 [RUST] DEVICE DETECTED CALLBACK FIRED!");
+                    log::info!(
+                        "⚡ Device detected: {} ({}:{}, Interface {}) - Press recognized!",
+                        detected_device.name,
+                        detected_device.vendor_id,
+                        detected_device.product_id,
+                        detected_device.interface_number
+                    );
+
+                    match app_clone.emit("monitoring-detected", serde_json::json!({
+                        "device": detected_device
+                    })) {
+                        Ok(_) => log::info!("✅ Event emitted successfully"),
+                        Err(e) => log::error!("❌ Failed to emit event: {}", e),
+                    }
+                }).map_err(|e| e.to_string())?;
+
+                Ok(IpcResult::ok_empty())
+            }
+            Err(e) => Ok(IpcResult::err(e.to_string())),
         }
-        Err(e) => Ok(IpcResult::err(e.to_string())),
     }
 }
 
@@ -300,10 +387,37 @@ pub async fn clear_logs(state: State<'_, AppState>) -> Result<IpcResult<()>, Str
 // ============================================
 
 #[tauri::command]
-pub async fn open_file_dialog(filters: Option<Vec<String>>) -> Result<IpcResult<Option<String>>, String> {
-    // In production, this would use native file dialog
-    // For now, return a placeholder
-    Ok(IpcResult::ok(None))
+pub async fn open_file_dialog(
+    app: tauri::AppHandle,
+    filters: Option<Vec<String>>,
+) -> Result<IpcResult<Option<String>>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    log::info!("open_file_dialog called with filters: {:?}", filters);
+
+    let mut builder = app.dialog().file();
+
+    // Set title
+    builder = builder.set_title("Select Application");
+
+    // Add filters if provided
+    if let Some(exts) = filters {
+        let ext_refs: Vec<&str> = exts.iter().map(|s| s.as_str()).collect();
+        builder = builder.add_filter("Executables", &ext_refs);
+    }
+
+    // Pick file synchronously (blocking)
+    log::info!("Opening file picker dialog...");
+    match builder.blocking_pick_file() {
+        Some(path) => {
+            log::info!("File selected: {}", path.to_string());
+            Ok(IpcResult::ok(Some(path.to_string())))
+        }
+        None => {
+            log::info!("File picker cancelled");
+            Ok(IpcResult::ok(None))
+        }
+    }
 }
 
 #[tauri::command]

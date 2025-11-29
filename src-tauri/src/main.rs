@@ -4,7 +4,11 @@
 mod commands;
 mod config;
 mod hid;
+mod input_monitor;
 mod types;
+
+#[cfg(windows)]
+mod rawinput;
 
 use config::ConfigManager;
 use hid::HidManager;
@@ -29,6 +33,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             config_manager: Mutex::new(config_manager),
             hid_manager: Mutex::new(hid_manager),
