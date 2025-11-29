@@ -5,6 +5,8 @@
 // In production: uses real Tauri invoke() calls
 // ============================================
 
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   HidDevice,
   DeviceBinding,
@@ -18,16 +20,12 @@ import { IPC_COMMANDS, IPC_EVENTS } from "../../../shared/ipc";
 
 // Check if running in Tauri environment
 const isTauri = (): boolean => {
-  return typeof window !== "undefined" && "__TAURI__" in window;
+  return typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
 };
 
 // Helper to invoke Tauri commands (only called in Tauri environment)
 const tauriInvoke = async <T>(cmd: string, args?: Record<string, unknown>): Promise<T> => {
-  const win = window as Window & { __TAURI__?: { invoke: <T>(cmd: string, args?: Record<string, unknown>) => Promise<T> } };
-  if (win.__TAURI__?.invoke) {
-    return win.__TAURI__.invoke(cmd, args);
-  }
-  throw new Error("Tauri not available");
+  return invoke<T>(cmd, args);
 };
 
 // Mock data for development
@@ -346,15 +344,35 @@ export const TauriBridge = {
   // --- Event System ---
 
   on(event: string, callback: EventCallback): () => void {
-    if (!eventListeners.has(event)) {
-      eventListeners.set(event, new Set());
+    if (isTauri()) {
+      // In Tauri mode - use actual Tauri event listener
+      let unlisten: UnlistenFn | null = null;
+
+      listen(event, (tauriEvent) => {
+        console.log(`[TauriBridge] Received Tauri event: ${event}`, tauriEvent.payload);
+        callback(tauriEvent.payload);
+      }).then(fn => {
+        unlisten = fn;
+      });
+
+      // Return unsubscribe function
+      return () => {
+        if (unlisten) {
+          unlisten();
+        }
+      };
+    } else {
+      // Development mode - use local event system
+      if (!eventListeners.has(event)) {
+        eventListeners.set(event, new Set());
+      }
+      eventListeners.get(event)!.add(callback);
+
+      // Return unsubscribe function
+      return () => {
+        eventListeners.get(event)?.delete(callback);
+      };
     }
-    eventListeners.get(event)!.add(callback);
-    
-    // Return unsubscribe function
-    return () => {
-      eventListeners.get(event)?.delete(callback);
-    };
   },
 
   emit(event: string, data: unknown): void {
