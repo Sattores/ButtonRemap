@@ -168,36 +168,36 @@ await TauriBridge.testAction({
 This is implemented in `src-tauri/src/commands.rs` and logs execution results.
 
 ## MCP Servers
-Используй эти MCP серверы:
-- **github** — работа с репозиториями, PR, issues
-- **filesystem** — чтение/запись файлов
-- **memory** — сохраняй важные решения и контекст
-- **sequential-thinking** — для задач >3 шагов
-- **context7** — поиск по документации библиотек
+Use these MCP servers:
+- **github** - repos, PRs, issues
+- **filesystem** - read/write files
+- **memory** - save important decisions and context
+- **sequential-thinking** - for tasks with >3 steps
+- **context7** - library documentation search
 
-## Правила работы
+## Rules
 
-### Память
-- Сохраняй в memory: архитектурные решения, найденные баги и их решения, договорённости с пользователем
-- При старте сессии проверяй memory на релевантный контекст
+### Memory
+- Save to memory: architecture decisions, bugs and fixes, user agreements
+- Check memory for relevant context at session start
 
-### Документация
-- После значимых изменений обновляй CLAUDE.md если меняется архитектура
-- Обновляй README.md при добавлении новых фич
-- Комментируй сложную логику в коде
+### Documentation
+- Update CLAUDE.md when architecture changes
+- Update README.md when adding new features
+- Comment complex logic in code
 
 ### Git
-- Атомарные коммиты с понятными сообщениями
-- Формат: `feat:`, `fix:`, `refactor:`, `docs:`
+- Atomic commits with clear messages
+- Format: `feat:`, `fix:`, `refactor:`, `docs:`
 
-### Код
-- TypeScript: строгая типизация, без any
-- Rust: обрабатывай все Result/Option
-- Тестируй изменения перед коммитом
+### Code
+- TypeScript: strict typing, no any
+- Rust: handle all Result/Option
+- Test changes before commit
 
-## Текущие задачи
-- [2024-11-29] Исправлена функция "Find Button" - добавлен real Tauri event listener в tauri-bridge.ts
-- [2024-11-29] Полная пересборка после cargo clean для применения всех изменений
+## Current Tasks
+- [2024-11-29] Fixed "Find Button" feature - added real Tauri event listener to tauri-bridge.ts
+- [2024-11-29] Full rebuild after cargo clean to apply all changes
 
-## Известные проблемы
-- [РЕШЕНО 2024-11-29] Events от backend не доходили до frontend - причина: tauri-bridge.ts использовал только mock event system. Исправлено добавлением `listen()` из `@tauri-apps/api/event`
+## Known Issues
+- [SOLVED 2024-11-29] Events from backend not reaching frontend - reason: tauri-bridge.ts used only mock event system. Fixed by adding `listen()` from `@tauri-apps/api/event`

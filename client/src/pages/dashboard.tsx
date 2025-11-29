@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import appIcon from "@/assets/icon-header.png";
 import { 
   Search, 
   RefreshCw, 
@@ -94,12 +95,20 @@ export default function Dashboard() {
   const { toast } = useToast();
 
   const selectedDevice = devices.find(d => d.id === selectedDeviceId);
-  
-  const filteredDevices = devices.filter(device => 
-    device.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    device.vendorId.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    device.productId.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
+  const filteredDevices = devices
+    .filter(device =>
+      device.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      device.vendorId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      device.productId.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Selected device always on top
+      if (a.id === selectedDeviceId) return -1;
+      if (b.id === selectedDeviceId) return 1;
+      // Rest sorted alphabetically by name
+      return a.name.localeCompare(b.name);
+    });
 
   // Load initial data
   useEffect(() => {
@@ -137,9 +146,35 @@ export default function Dashboard() {
 
     // Subscribe to monitoring detection
     const unsubMonitor = TauriBridge.on(IPC_EVENTS.MONITORING_DETECTED, (data: { device: HidDevice }) => {
+      console.log("📥 [Frontend] Received monitoring-detected event:", data);
       setIsMonitoring(false);
-      handleSelectDevice(data.device.id);
-      toast({ title: "Device Detected!", description: `${data.device.name} pressed` });
+
+      console.log(`🔍 [Frontend] Looking for device ${data.device.id} in list of ${devices.length} devices`);
+
+      // Move detected device to the top of the list
+      setDevices(prev => {
+        const detectedIndex = prev.findIndex(d => d.id === data.device.id);
+        console.log(`🔍 [Frontend] Device index in list: ${detectedIndex}`);
+
+        if (detectedIndex !== -1) {
+          // Device found - move it to top
+          const newDevices = [...prev];
+          const [detectedDevice] = newDevices.splice(detectedIndex, 1);
+          console.log("✅ [Frontend] Moved device to top of list");
+          return [detectedDevice, ...newDevices];
+        } else {
+          console.log("⚠️ [Frontend] Device not found in list - adding it");
+          // Device not in list - add it at the top
+          return [data.device, ...prev];
+        }
+      });
+
+      // Select the detected device
+      console.log(`📌 [Frontend] Selecting device ${data.device.id}`);
+      setTimeout(() => handleSelectDevice(data.device.id), 0);
+
+      addLog("success", `Device found: ${data.device.name} (${data.device.vendorId}:${data.device.productId}, Interface ${data.device.interfaceNumber})`, "Monitor");
+      toast({ title: "Device Detected!", description: `${data.device.name} (${data.device.vendorId}:${data.device.productId})` });
     });
 
     return () => {
@@ -184,7 +219,7 @@ export default function Dashboard() {
   const handleSaveConfig = async () => {
     if (!selectedDevice) return;
     setIsSaving(true);
-    
+
     try {
       const action: ActionConfig = {
         type: "launch-app",
@@ -192,17 +227,30 @@ export default function Dashboard() {
         arguments: config.appArgs,
       };
 
-      const bindingData = {
+      // Check if binding already exists for this device
+      const existingBinding = bindings.find(b => b.deviceId === selectedDevice.id);
+
+      const bindingData: DeviceBinding = existingBinding ? {
+        // Update existing binding
+        ...existingBinding,
+        triggerType: config.triggerType,
+        action,
+        updatedAt: new Date().toISOString(),
+      } : {
+        // Create new binding
+        id: crypto.randomUUID(),
         deviceId: selectedDevice.id,
         vendorId: selectedDevice.vendorId,
         productId: selectedDevice.productId,
         triggerType: config.triggerType,
         action,
         enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const result = await TauriBridge.saveBinding(bindingData);
-      
+
       if (result.success && result.data) {
         setBindings(prev => {
           const existing = prev.findIndex(b => b.deviceId === selectedDevice.id);
@@ -213,13 +261,13 @@ export default function Dashboard() {
           }
           return [...prev, result.data!];
         });
-        
-        setDevices(prev => prev.map(d => 
+
+        setDevices(prev => prev.map(d =>
           d.id === selectedDevice.id ? { ...d, status: "configured" } : d
         ));
-        
-        addLog("success", `Configuration saved for ${selectedDevice.vendorId}:${selectedDevice.productId}`, "Config");
-        toast({ title: "Saved", description: "Button configuration updated successfully" });
+
+        addLog("success", `Saved: ${selectedDevice.name} (${selectedDevice.vendorId}:${selectedDevice.productId}, Interface ${selectedDevice.interfaceNumber}) → ${config.appPath}`, "Config");
+        toast({ title: "Saved", description: `${selectedDevice.name} configured successfully` });
       }
     } catch (error) {
       addLog("error", "Failed to save configuration", "Config");
@@ -252,27 +300,32 @@ export default function Dashboard() {
     if (device.status === "disconnected") {
       addLog("error", `Could not connect to ${device.name}: Device disconnected`, "HID");
     } else {
-      addLog("info", `Selected device: ${device.name} (${device.vendorId}:${device.productId})`, "HID");
+      const bindingInfo = bindings.find(b => b.deviceId === id);
+      const bindingText = bindingInfo ? ` → ${bindingInfo.action.executablePath}` : " (not configured)";
+      addLog("info", `Selected: ${device.name} (${device.vendorId}:${device.productId}, Interface ${device.interfaceNumber})${bindingText}`, "HID");
     }
-  }, [devices, addLog]);
+  }, [devices, bindings, addLog]);
 
   const handleResetConfig = async () => {
     if (!selectedDevice) return;
-    
+
     const binding = bindings.find(b => b.deviceId === selectedDevice.id);
     if (binding) {
       await TauriBridge.deleteBinding(binding.id);
       setBindings(prev => prev.filter(b => b.id !== binding.id));
     }
-    
+
     setConfig({ appPath: "", appArgs: "", triggerType: "single-press" });
-    
-    setDevices(prev => prev.map(d => 
+
+    setDevices(prev => prev.map(d =>
       d.id === selectedDeviceId ? { ...d, status: "connected" } : d
     ));
-    
-    addLog("info", `Configuration cleared for ${selectedDevice.vendorId}:${selectedDevice.productId}`, "Config");
-    toast({ title: "Reset", description: "Button configuration cleared" });
+
+    addLog("info", `Reset: ${selectedDevice.name} (${selectedDevice.vendorId}:${selectedDevice.productId}, Interface ${selectedDevice.interfaceNumber}) configuration cleared`, "Config");
+    toast({ title: "Reset", description: `${selectedDevice.name} configuration cleared` });
+
+    // Clear device selection
+    setSelectedDeviceId(null);
   };
 
   const applyPreset = (preset: typeof DEFAULT_PRESETS[0]["items"][0]) => {
@@ -335,7 +388,7 @@ export default function Dashboard() {
             <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-tr from-slate-100 to-slate-200 flex items-center justify-center shadow-sm border border-slate-200/50 relative overflow-hidden">
                 <div className="absolute inset-0 rounded-full border border-slate-300/30 animate-[spin_10s_linear_infinite]" />
                 <div className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center relative z-10">
-                    <Usb className="w-3.5 h-3.5 text-slate-400" />
+                    <img src={appIcon} className="w-5 h-5" alt="App Icon" />
                 </div>
             </div>
             <div>
@@ -534,10 +587,10 @@ export default function Dashboard() {
                             </CardTitle>
                             <CardDescription>Setup the action for this button</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-6 flex-1">
+                        <CardContent className="space-y-3 flex-1">
                             
                             {/* Quick Presets Dropdown */}
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Preset</Label>
                                 <Select onValueChange={(val) => {
                                     const allPresets = DEFAULT_PRESETS.flatMap(p => p.items);
@@ -567,7 +620,7 @@ export default function Dashboard() {
                             </div>
 
                             {/* App Path */}
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                             <Label htmlFor="app-path" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Application Path</Label>
                             <div className="flex gap-2">
                                 <Input 
@@ -597,7 +650,7 @@ export default function Dashboard() {
                             </div>
 
                             {/* Arguments */}
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                             <Label htmlFor="app-args" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Arguments</Label>
                             <Input 
                                 id="app-args" 
@@ -614,17 +667,17 @@ export default function Dashboard() {
                             {/* Trigger Type */}
                             <div className="space-y-3">
                             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Trigger Type</Label>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-3 gap-2">
                                 {[
                                 { id: "single-press", label: "Single Press", icon: MousePointerClick, desc: "Standard click" },
                                 { id: "double-press", label: "Double Press", icon: Copy, desc: "Quick double click" },
                                 { id: "long-press", label: "Long Press", icon: Clock, desc: "Hold > 500ms" },
                                 ].map((type) => (
-                                <div 
+                                <div
                                     key={type.id}
                                     onClick={() => setConfig({...config, triggerType: type.id as TriggerType})}
                                     className={`
-                                    cursor-pointer rounded-xl border-2 p-3 flex flex-col items-center gap-2 transition-all relative overflow-hidden
+                                    cursor-pointer rounded-xl border-2 p-2 flex flex-col items-center gap-2 transition-all relative overflow-hidden
                                     ${config.triggerType === type.id 
                                         ? "border-primary bg-primary/5 text-primary" 
                                         : "border-transparent bg-secondary/50 hover:bg-secondary hover:scale-[1.02]"
@@ -649,7 +702,7 @@ export default function Dashboard() {
                             {/* Footer Actions */}
                             <div className="flex items-center justify-between pt-2">
                                 <div className="flex items-center gap-2">
-                                    {selectedDevice.status === "configured" && (
+                                    {selectedDevice && bindings.some(b => b.deviceId === selectedDevice.id) && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Button variant="ghost" size="sm" onClick={handleResetConfig} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" data-testid="button-reset-mapping">
@@ -677,22 +730,121 @@ export default function Dashboard() {
                 )}
               </motion.div>
             ) : (
-              <motion.div 
+              <motion.div
                 key="empty-state"
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground space-y-6"
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col h-full max-w-5xl mx-auto w-full gap-6"
               >
-                <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-slate-100 to-slate-200 flex items-center justify-center shadow-inner mb-4 relative">
-                    <div className="absolute inset-0 rounded-full border border-slate-200 animate-[spin_10s_linear_infinite]" />
-                    <div className="w-24 h-24 rounded-full bg-white shadow-xl flex items-center justify-center relative z-10">
-                        <Usb className="w-10 h-10 text-slate-300" />
+                {/* Header placeholder */}
+                <div className="flex items-center justify-between opacity-50">
+                  <div>
+                    <h2 className="text-3xl font-bold tracking-tight text-muted-foreground">
+                      No Device Selected
+                    </h2>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant="outline" className="font-mono text-xs">VID: ----</Badge>
+                      <Badge variant="outline" className="font-mono text-xs">PID: ----</Badge>
                     </div>
+                  </div>
                 </div>
-                <div className="max-w-md space-y-2">
-                  <h2 className="text-2xl font-bold text-foreground">No Device Selected</h2>
-                  <p>Select a USB device from the sidebar to configure it, or use the detection mode to find your button.</p>
+
+                {/* Disabled form with hint */}
+                <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col gap-6 relative">
+                  {/* Hint overlay */}
+                  <div className="absolute -top-2 left-0 right-0 z-10 flex justify-center">
+                    <div className="bg-primary/10 text-primary text-sm font-medium px-4 py-2 rounded-full border border-primary/20 shadow-sm">
+                      👆 Select a device from the sidebar or click "Find Button"
+                    </div>
+                  </div>
+
+                  <Card className="border-none shadow-lg bg-white/60 backdrop-blur-md h-full flex flex-col opacity-60 pointer-events-none select-none">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg flex items-center gap-2 text-muted-foreground">
+                        <Settings className="w-5 h-5" />
+                        Configuration
+                      </CardTitle>
+                      <CardDescription>Setup the action for this button</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 flex-1">
+
+                      {/* Quick Presets Dropdown - disabled */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Preset</Label>
+                        <Select disabled>
+                          <SelectTrigger className="h-12 bg-secondary/30 border-border/50">
+                            <SelectValue placeholder="Select a preset..." />
+                          </SelectTrigger>
+                        </Select>
+                      </div>
+
+                      {/* App Path - disabled */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Application Path</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="C:\Path\To\Application.exe"
+                            disabled
+                            className="font-mono text-sm bg-background/50 h-10"
+                          />
+                          <Button variant="secondary" size="icon" className="h-10 w-10 shrink-0" disabled>
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Arguments - disabled */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Arguments</Label>
+                        <Input
+                          placeholder="e.g. --fullscreen --silent"
+                          disabled
+                          className="font-mono text-sm bg-background/50 h-10"
+                        />
+                      </div>
+
+                      <Separator className="my-2" />
+
+                      {/* Trigger Type - disabled */}
+                      <div className="space-y-3">
+                        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Trigger Type</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: "single-press", label: "Single Press", icon: MousePointerClick },
+                            { id: "double-press", label: "Double Press", icon: Copy },
+                            { id: "long-press", label: "Long Press", icon: Clock },
+                          ].map((type) => (
+                            <div
+                              key={type.id}
+                              className="rounded-xl border-2 p-2 flex flex-col items-center gap-2 border-transparent bg-secondary/30"
+                            >
+                              <type.icon className="w-5 h-5 text-muted-foreground" />
+                              <div className="text-center">
+                                <div className="text-sm font-bold leading-none mb-1 text-muted-foreground">{type.label}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex-1" />
+
+                      {/* Footer Actions - disabled */}
+                      <div className="flex items-center justify-end pt-2">
+                        <div className="flex items-center gap-3">
+                          <Button variant="ghost" disabled className="text-muted-foreground">
+                            <PlayCircle className="w-4 h-4 mr-2" /> Test Action
+                          </Button>
+                          <Button disabled className="min-w-[140px]">
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Config
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </motion.div>
             )}
@@ -700,7 +852,7 @@ export default function Dashboard() {
         </div>
 
         {/* Log Panel - Fixed Bottom */}
-        <div className="h-48 bg-white/90 backdrop-blur border-t border-border flex flex-col z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
+        <div className="h-32 bg-white/90 backdrop-blur border-t border-border flex flex-col z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
           <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-slate-50/50">
             <div className="flex items-center gap-2">
               <Terminal className="w-4 h-4 text-muted-foreground" />
