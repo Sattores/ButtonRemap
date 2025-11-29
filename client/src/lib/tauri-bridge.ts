@@ -154,31 +154,49 @@ export const TauriBridge = {
   // --- Monitoring ---
 
   async startMonitoring(): Promise<IpcResult<void>> {
+    console.log("🔵 [TauriBridge] startMonitoring() called");
     if (isTauri()) {
-      return tauriInvoke(IPC_COMMANDS.START_MONITORING);
+      console.log("🔵 [TauriBridge] In Tauri mode - invoking backend command:", IPC_COMMANDS.START_MONITORING);
+      try {
+        const result = await tauriInvoke<IpcResult<void>>(IPC_COMMANDS.START_MONITORING);
+        console.log("🔵 [TauriBridge] startMonitoring backend result:", result);
+        return result;
+      } catch (error) {
+        console.error("❌ [TauriBridge] startMonitoring failed:", error);
+        return { success: false, error: String(error) };
+      }
     }
+    console.log("🔵 [TauriBridge] Mock mode - starting simulated monitoring");
     monitoringState.isActive = true;
-    
+
     // Simulate device detection after 2-4 seconds
     setTimeout(() => {
       if (monitoringState.isActive && Math.random() > 0.3) {
         const detected = MOCK_DEVICES[1]; // Generic USB Button
         monitoringState.detectedDevice = detected;
         monitoringState.isActive = false;
-        
+
+        console.log("🔵 [TauriBridge] Mock monitoring detected device:", detected);
+
         // Emit event
         const callbacks = eventListeners.get(IPC_EVENTS.MONITORING_DETECTED);
+        console.log(`🔵 [TauriBridge] Mock mode - emitting to ${callbacks?.size || 0} listeners`);
         callbacks?.forEach((cb) => cb({ device: detected }));
       }
     }, 2000 + Math.random() * 2000);
-    
+
     return { success: true };
   },
 
   async stopMonitoring(): Promise<IpcResult<void>> {
+    console.log("🟡 [TauriBridge] stopMonitoring() called");
     if (isTauri()) {
-      return tauriInvoke(IPC_COMMANDS.STOP_MONITORING);
+      console.log("🟡 [TauriBridge] In Tauri mode - invoking backend command:", IPC_COMMANDS.STOP_MONITORING);
+      const result = await tauriInvoke<IpcResult<void>>(IPC_COMMANDS.STOP_MONITORING);
+      console.log("🟡 [TauriBridge] stopMonitoring result:", result);
+      return result;
     }
+    console.log("🟡 [TauriBridge] Mock mode - stopping monitoring");
     monitoringState.isActive = false;
     monitoringState.detectedDevice = undefined;
     return { success: true };
@@ -344,32 +362,42 @@ export const TauriBridge = {
   // --- Event System ---
 
   on(event: string, callback: EventCallback): () => void {
+    console.log(`🔔 [TauriBridge] Registering event listener for: "${event}"`);
+
     if (isTauri()) {
       // In Tauri mode - use actual Tauri event listener
+      console.log(`🔔 [TauriBridge] Using Tauri event system for "${event}"`);
       let unlisten: UnlistenFn | null = null;
 
       listen(event, (tauriEvent) => {
-        console.log(`[TauriBridge] Received Tauri event: ${event}`, tauriEvent.payload);
+        console.log(`📨 [TauriBridge] ✅ Received Tauri event: "${event}"`, tauriEvent.payload);
         callback(tauriEvent.payload);
       }).then(fn => {
         unlisten = fn;
+        console.log(`🔔 [TauriBridge] Successfully registered Tauri listener for "${event}"`);
+      }).catch(err => {
+        console.error(`❌ [TauriBridge] Failed to register Tauri listener for "${event}":`, err);
       });
 
       // Return unsubscribe function
       return () => {
+        console.log(`🔕 [TauriBridge] Unregistering Tauri listener for "${event}"`);
         if (unlisten) {
           unlisten();
         }
       };
     } else {
       // Development mode - use local event system
+      console.log(`🔔 [TauriBridge] Using mock event system for "${event}"`);
       if (!eventListeners.has(event)) {
         eventListeners.set(event, new Set());
       }
       eventListeners.get(event)!.add(callback);
+      console.log(`🔔 [TauriBridge] Mock listener registered. Total listeners for "${event}": ${eventListeners.get(event)!.size}`);
 
       // Return unsubscribe function
       return () => {
+        console.log(`🔕 [TauriBridge] Unregistering mock listener for "${event}"`);
         eventListeners.get(event)?.delete(callback);
       };
     }

@@ -145,37 +145,43 @@ export default function Dashboard() {
     });
 
     // Subscribe to monitoring detection
+    console.log("🔔 [Dashboard] Setting up event listener for:", IPC_EVENTS.MONITORING_DETECTED);
     const unsubMonitor = TauriBridge.on(IPC_EVENTS.MONITORING_DETECTED, (data: { device: HidDevice }) => {
-      console.log("📥 [Frontend] Received monitoring-detected event:", data);
-      setIsMonitoring(false);
+      console.log("📥📥📥 [Dashboard] ✅✅✅ MONITORING EVENT RECEIVED! ✅✅✅ 📥📥📥");
+      console.log("📥 [Dashboard] Event data:", data);
+      console.log("📥 [Dashboard] Device:", data.device);
 
-      console.log(`🔍 [Frontend] Looking for device ${data.device.id} in list of ${devices.length} devices`);
+      setIsMonitoring(false);
+      console.log("📥 [Dashboard] Set isMonitoring to false");
+
+      console.log(`🔍 [Dashboard] Looking for device ${data.device.id} in list of ${devices.length} devices`);
 
       // Move detected device to the top of the list
       setDevices(prev => {
         const detectedIndex = prev.findIndex(d => d.id === data.device.id);
-        console.log(`🔍 [Frontend] Device index in list: ${detectedIndex}`);
+        console.log(`🔍 [Dashboard] Device index in list: ${detectedIndex}`);
 
         if (detectedIndex !== -1) {
           // Device found - move it to top
           const newDevices = [...prev];
           const [detectedDevice] = newDevices.splice(detectedIndex, 1);
-          console.log("✅ [Frontend] Moved device to top of list");
+          console.log("✅ [Dashboard] Moved device to top of list");
           return [detectedDevice, ...newDevices];
         } else {
-          console.log("⚠️ [Frontend] Device not found in list - adding it");
+          console.log("⚠️ [Dashboard] Device not found in list - adding it");
           // Device not in list - add it at the top
           return [data.device, ...prev];
         }
       });
 
       // Select the detected device
-      console.log(`📌 [Frontend] Selecting device ${data.device.id}`);
+      console.log(`📌 [Dashboard] Selecting device ${data.device.id}`);
       setTimeout(() => handleSelectDevice(data.device.id), 0);
 
       addLog("success", `Device found: ${data.device.name} (${data.device.vendorId}:${data.device.productId}, Interface ${data.device.interfaceNumber})`, "Monitor");
       toast({ title: "Device Detected!", description: `${data.device.name} (${data.device.vendorId}:${data.device.productId})` });
     });
+    console.log("🔔 [Dashboard] Event listener registered for:", IPC_EVENTS.MONITORING_DETECTED);
 
     return () => {
       unsubscribe();
@@ -205,14 +211,31 @@ export default function Dashboard() {
   };
 
   const toggleMonitoring = async () => {
+    console.log("🎯 [Dashboard] toggleMonitoring() called, current isMonitoring:", isMonitoring);
+
     if (!isMonitoring) {
+      console.log("🎯 [Dashboard] Starting monitoring flow...");
       setIsMonitoring(true);
       addLog("info", "Started 'Find by Press' monitoring", "HID");
-      await TauriBridge.startMonitoring();
+
+      console.log("🎯 [Dashboard] Calling TauriBridge.startMonitoring()...");
+      const result = await TauriBridge.startMonitoring();
+      console.log("🎯 [Dashboard] TauriBridge.startMonitoring() returned:", result);
+
+      if (!result.success) {
+        console.error("❌ [Dashboard] startMonitoring failed:", result.error);
+        setIsMonitoring(false);
+        addLog("error", `Failed to start monitoring: ${result.error}`, "HID");
+      } else {
+        console.log("✅ [Dashboard] Monitoring started successfully");
+      }
     } else {
+      console.log("🎯 [Dashboard] Stopping monitoring...");
       setIsMonitoring(false);
       addLog("info", "Stopped monitoring", "HID");
-      await TauriBridge.stopMonitoring();
+
+      const result = await TauriBridge.stopMonitoring();
+      console.log("🎯 [Dashboard] TauriBridge.stopMonitoring() returned:", result);
     }
   };
 
