@@ -35,43 +35,20 @@ echo [2/5] Настройка конфигурации...
 
 if exist "package.tauri.json" (
     copy /y "package.tauri.json" "package.json" >nul
-    echo   √ package.json
+    echo   √ package.json обновлён
 )
 
 if exist "vite.config.tauri.ts" (
     copy /y "vite.config.tauri.ts" "vite.config.ts" >nul
-    echo   √ vite.config.ts
-)
-
-if exist "postcss.config.tauri.cjs" (
-    copy /y "postcss.config.tauri.cjs" "postcss.config.cjs" >nul
-    echo   √ postcss.config.cjs
-)
-
-if exist "tailwind.config.tauri.cjs" (
-    copy /y "tailwind.config.tauri.cjs" "tailwind.config.cjs" >nul
-    echo   √ tailwind.config.cjs
-)
-
-if exist "client\src\index.tauri.css" (
-    copy /y "client\src\index.tauri.css" "client\src\index.css" >nul
-    echo   √ index.css (Tailwind 3)
+    echo   √ vite.config.ts обновлён
 )
 
 echo.
 echo [3/5] Установка зависимостей...
 
-:: Удаляем старые зависимости при первом запуске с новыми конфигами
-if exist "node_modules\.old_config" (
-    echo   √ Зависимости актуальны
-) else (
-    if exist "node_modules" (
-        echo   - Удаление старых зависимостей...
-        rmdir /s /q "node_modules" >nul 2>&1
-    )
+if not exist "node_modules" (
     echo   - Установка npm пакетов...
     call npm install
-    echo. > "node_modules\.old_config"
 )
 echo   √ npm зависимости готовы
 
@@ -100,7 +77,7 @@ echo   Файлы находятся в:
 echo   src-tauri\target\release\bundle\
 echo.
 
-:: Открыть папку с результатом
+// Открыть папку с результатом
 if exist "src-tauri\target\release\bundle\msi" (
     explorer "src-tauri\target\release\bundle\msi"
 )

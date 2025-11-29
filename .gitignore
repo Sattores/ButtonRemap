@@ -9,8 +9,10 @@ vite.config.ts.*
 src-tauri/target
 src-tauri/Cargo.lock
 src-tauri/WixTools
+src-tauri/gen
 src-tauri/icons/*.ico
 src-tauri/icons/*.icns
+.local
 
 # IDE
 .idea
