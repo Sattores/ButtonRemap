@@ -195,6 +195,12 @@ Use these MCP servers:
 - Rust: handle all Result/Option
 - Test changes before commit
 
+### File Editing
+- Use Serena MCP for code edits when available
+- Never rewrite entire files - make surgical edits
+- Always preserve existing functionality
+- Show diff before committing
+
 ## Current Tasks
 - [2024-11-29] Fixed "Find Button" feature - added real Tauri event listener to tauri-bridge.ts
 - [2024-11-29] Full rebuild after cargo clean to apply all changes
