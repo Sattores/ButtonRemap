@@ -203,7 +203,43 @@ Use these MCP servers:
 
 ## Current Tasks
 - [2024-11-29] Fixed "Find Button" feature - added real Tauri event listener to tauri-bridge.ts
-- [2024-11-29] Full rebuild after cargo clean to apply all changes
+- [2024-11-29] Fixed device auto-selection after "Find Button" (stale closure fix)
+- [2024-11-29] Fixed System Log panel - logs now update via direct React state
+- [2024-11-29] Added log entries: preset applied, application selected, logs copied/exported
+- [2024-11-29] Updated icons: icon-256.png for header, icon-64.png for tray
 
 ## Known Issues
 - [SOLVED 2024-11-29] Events from backend not reaching frontend - reason: tauri-bridge.ts used only mock event system. Fixed by adding `listen()` from `@tauri-apps/api/event`
+- [SOLVED 2024-11-29] System Log panel not updating - reason: `TauriBridge.addLog()` emits to mock eventListeners, but `TauriBridge.on()` in Tauri mode uses real Tauri events (different systems!). Fixed by updating React state directly in `addLog` callback.
+- [SOLVED 2024-11-29] Device not highlighted after "Find Button" success - reason: `handleSelectDevice` called from useEffect with `[]` deps has stale `devices` closure (empty array). Fixed by using `setSelectedDeviceId()` directly instead of `handleSelectDevice()`.
+
+## Common Pitfalls
+
+### TauriBridge Dual Event Systems
+`tauri-bridge.ts` has TWO separate event systems that don't communicate:
+1. **Tauri mode**: Uses `listen()` from `@tauri-apps/api/event` for real Tauri events
+2. **Dev/mock mode**: Uses local `eventListeners` Map for mock events
+
+`TauriBridge.addLog()` only emits to mock eventListeners. For UI updates, modify React state directly.
+
+### Stale Closures in useEffect
+Callbacks defined inside `useEffect(() => {...}, [])` capture state at mount time. If the callback uses state variables, they will be stale when the callback executes later.
+
+**Bad:**
+```typescript
+useEffect(() => {
+  TauriBridge.on("event", (data) => {
+    handleSelectDevice(data.id); // handleSelectDevice has stale `devices`
+  });
+}, []);
+```
+
+**Good:**
+```typescript
+useEffect(() => {
+  TauriBridge.on("event", (data) => {
+    setSelectedDeviceId(data.id); // setState works correctly
+    setConfig({ ... }); // direct state updates
+  });
+}, []);
+```
