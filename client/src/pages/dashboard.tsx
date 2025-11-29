@@ -177,7 +177,9 @@ export default function Dashboard() {
       // Auto-select the detected device
       console.log(`📌 [Dashboard] Auto-selecting device ${data.device.id}`);
       setSelectedDeviceId(data.device.id);
-      setTimeout(() => handleSelectDevice(data.device.id), 0);
+      
+      // Reset config for new device (handleSelectDevice has stale closure in useEffect)
+      setConfig({ appPath: "", appArgs: "", triggerType: "single-press" });
 
       addLog("success", `Device found: ${data.device.name} (${data.device.vendorId}:${data.device.productId}, Interface ${data.device.interfaceNumber})`, "Monitor");
       toast({ title: "Device Detected!", description: `${data.device.name} (${data.device.vendorId}:${data.device.productId})` });
@@ -193,6 +195,14 @@ export default function Dashboard() {
   // --- Handlers ---
 
   const addLog = useCallback((level: LogEntry["level"], message: string, source?: string) => {
+    const entry: LogEntry = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      source,
+    };
+    setLogs(prev => [entry, ...prev].slice(0, 50));
     TauriBridge.addLog(level, message, source);
   }, []);
 
@@ -360,6 +370,7 @@ export default function Dashboard() {
       appPath: preset.action.executablePath,
       appArgs: preset.action.arguments,
     }));
+    addLog("info", `Preset applied: ${preset.name} → ${preset.action.executablePath}`, "Config");
     toast({ title: "Preset Applied", description: `${preset.name} settings loaded` });
   };
 
@@ -383,10 +394,12 @@ export default function Dashboard() {
   const handleExportLogs = () => {
     const text = logs.map(l => `[${l.timestamp}] ${l.level.toUpperCase()}: ${l.message}`).join('\n');
     navigator.clipboard.writeText(text);
+    addLog("info", "Logs copied to clipboard", "System");
     toast({ title: "Copied", description: "Logs copied to clipboard" });
   };
 
   const handleSaveLogs = () => {
+    addLog("info", "Logs exported to file", "System");
     toast({ title: "Logs Saved", description: "Saved to logs.txt" });
   };
 
@@ -664,6 +677,7 @@ export default function Dashboard() {
                                     const result = await TauriBridge.openFileDialog(["exe", "bat", "cmd", "ps1", "py"]);
                                     if (result.success && result.data) {
                                       setConfig(prev => ({ ...prev, appPath: result.data! }));
+                                      addLog("info", `Application selected: ${result.data}`, "Config");
                                       toast({ title: "File Selected", description: result.data });
                                     }
                                   }}
