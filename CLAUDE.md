@@ -201,6 +201,27 @@ Use these MCP servers:
 - Always preserve existing functionality
 - Show diff before committing
 
+### Edit Workflow (CRITICAL)
+1. **NEVER rewrite entire files** - Only surgical edits
+2. **Before ANY file edit:**
+   - `git stash` (save current work)
+   - `git status` (check state)
+3. **After EACH small change that works:**
+   - `git add -A && git commit -m "description"`
+4. **Use Serena MCP for code edits when possible**
+5. **ONE feature at a time:**
+   - Implement
+   - Test
+   - Commit
+   - Then next feature
+6. **If something breaks:**
+   - STOP
+   - `git diff` (show what changed)
+   - `git checkout -- <file>` (revert)
+   - Try again with smaller change
+7. **NEVER delete existing code unless explicitly asked**
+8. **Show diff BEFORE applying changes to critical files** (dashboard.tsx, main.rs, etc.)
+
 ## Current Tasks
 - [2024-11-29] Fixed "Find Button" feature - added real Tauri event listener to tauri-bridge.ts
 - [2024-11-29] Fixed device auto-selection after "Find Button" (stale closure fix)
