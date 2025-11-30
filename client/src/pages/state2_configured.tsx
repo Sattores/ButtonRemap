@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import appIcon from "@/assets/icon-header.png";
 import { 
   Search, 
   RefreshCw, 
@@ -234,9 +235,7 @@ export default function State2Configured() {
       <div className="w-80 border-r border-sidebar-border bg-sidebar flex flex-col shadow-xl z-20">
         <div className="p-6 flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-              <Usb className="w-6 h-6" />
-            </div>
+            <img src={appIcon} className="w-10 h-10 rounded-full" alt="icon" />
             <div>
               <h1 className="font-bold text-lg leading-tight tracking-tight">USB Configurator</h1>
               <p className="text-xs text-muted-foreground font-medium">v2.1.0 PRO</p>

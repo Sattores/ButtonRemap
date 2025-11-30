@@ -10,37 +10,52 @@ mod types;
 #[cfg(windows)]
 mod rawinput;
 
+#[cfg(windows)]
+mod listener;
+
 use config::ConfigManager;
 use hid::HidManager;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 pub struct AppState {
-    pub config_manager: Mutex<ConfigManager>,
+    pub config_manager: Arc<Mutex<ConfigManager>>,
     pub hid_manager: Mutex<HidManager>,
 }
 
 fn main() {
     env_logger::init();
-    
+
     let config_manager = ConfigManager::new().expect("Failed to initialize config manager");
     let mut hid_manager = HidManager::new().expect("Failed to initialize HID manager");
-    
+
     // Initialize HID manager with configured device IDs from saved bindings
     for device_id in config_manager.get_configured_device_ids() {
         hid_manager.set_device_configured(&device_id);
     }
 
+    // Wrap config_manager in Arc for sharing with background listener
+    let config_manager = Arc::new(Mutex::new(config_manager));
+    let config_manager_for_listener = config_manager.clone();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
-            config_manager: Mutex::new(config_manager),
+            config_manager,
             hid_manager: Mutex::new(hid_manager),
         })
-        .setup(|app| {
+        .setup(move |app| {
             log::info!("USB Configurator starting...");
-            
+
+            // Start background listener for configured devices
+            #[cfg(windows)]
+            {
+                let listener = listener::BackgroundListener::new(config_manager_for_listener.clone());
+                listener.start();
+                log::info!("Background listener started");
+            }
+
             // Initialize system tray if available
             #[cfg(desktop)]
             {

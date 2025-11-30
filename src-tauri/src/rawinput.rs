@@ -1,9 +1,11 @@
 use crate::input_monitor::InputMonitor;
 use crate::types::{DeviceStatus, HidDevice};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
+
+static MONITOR_COUNTER: AtomicU32 = AtomicU32::new(0);
 use windows::Win32::Devices::HumanInterfaceDevice::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::LibraryLoader::*;
@@ -36,8 +38,10 @@ impl RawInputMonitor {
     fn create_window_class_name() -> Vec<u16> {
         use std::os::windows::ffi::OsStrExt;
         use std::ffi::OsStr;
-        let class_name = "RawInputMonitorClass";
-        OsStr::new(class_name)
+        // Use unique class name per instance to avoid conflicts
+        let counter = MONITOR_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let class_name = format!("RawInputMonitorClass_{}", counter);
+        OsStr::new(&class_name)
             .encode_wide()
             .chain(Some(0))
             .collect()
@@ -301,6 +305,40 @@ impl RawInputMonitor {
         let pid = u16::from_str_radix(pid_str, 16).ok()?;
 
         Some((vid, pid))
+    }
+}
+
+impl RawInputMonitor {
+    /// Start persistent monitoring (doesn't stop after first detection)
+    /// Used for background listener
+    pub fn start_monitoring_persistent(&mut self) -> Receiver<HidDevice> {
+        let (tx, rx) = channel();
+        let raw_rx = self.start_monitoring_internal();
+
+        // Spawn thread to convert RawInputDevice to HidDevice
+        thread::spawn(move || {
+            while let Ok(raw_device) = raw_rx.recv() {
+                let hid_device = HidDevice {
+                    id: format!("{:04X}:{:04X}", raw_device.vendor_id, raw_device.product_id),
+                    name: raw_device.device_name.clone(),
+                    vendor_id: format!("{:04X}", raw_device.vendor_id),
+                    product_id: format!("{:04X}", raw_device.product_id),
+                    interface_number: 0,
+                    total_interfaces: 1,
+                    status: DeviceStatus::Connected,
+                    manufacturer: None,
+                    serial_number: None,
+                };
+
+                println!("🔄 [RawInput] Device input: {} ({}:{})",
+                    hid_device.name, hid_device.vendor_id, hid_device.product_id);
+
+                let _ = tx.send(hid_device);
+                // NO break - continue listening
+            }
+        });
+
+        rx
     }
 }
 
