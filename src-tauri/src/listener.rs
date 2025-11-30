@@ -34,17 +34,49 @@ impl BackgroundListener {
             log::info!("Device input detected: {}", device_id);
 
             // Look up binding for this device
-            if let Ok(config) = self.config_manager.lock() {
+            if let Ok(mut config) = self.config_manager.lock() {
+                // Log that we detected input
+                config.add_log(
+                    LogEntryLevel::Info,
+                    format!("Button pressed on device {}", device_id),
+                    Some(device_id.clone()),
+                );
+
                 if let Some(binding) = config.get_binding(&device_id) {
                     if binding.enabled {
-                        log::info!("Executing action for device: {}", device_id);
+                        let action = binding.action.clone();
+                        let action_desc = format!("{}: {}",
+                            match action.r#type {
+                                ActionType::LaunchApp => "Launch App",
+                                ActionType::RunScript => "Run Script",
+                                ActionType::SystemCommand => "System Command",
+                                ActionType::Hotkey => "Hotkey",
+                            },
+                            action.executable_path
+                        );
+
+                        // Log that we're about to execute
+                        config.add_log(
+                            LogEntryLevel::Info,
+                            format!("Executing: {}", action_desc),
+                            Some(device_id.clone()),
+                        );
+
                         drop(config); // Release lock before executing
-                        self.execute_action(&binding.action, &device_id);
+                        self.execute_action(&action, &device_id);
                     } else {
-                        log::debug!("Binding disabled for device: {}", device_id);
+                        config.add_log(
+                            LogEntryLevel::Warn,
+                            format!("Binding disabled for device {}", device_id),
+                            Some(device_id.clone()),
+                        );
                     }
                 } else {
-                    log::debug!("No binding configured for device: {}", device_id);
+                    config.add_log(
+                        LogEntryLevel::Warn,
+                        format!("No binding configured for device {}", device_id),
+                        Some(device_id.clone()),
+                    );
                 }
             }
         }
