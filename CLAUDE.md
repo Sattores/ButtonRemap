@@ -179,57 +179,7 @@ Use these MCP servers:
 - **github** - repos, PRs, issues
 - **filesystem** - read/write files
 - **memory** - save important decisions and context
-- **sequential-thinking** - for tasks with >3 steps
-- **context7** - library documentation search
-- **playwright** - browser automation, E2E testing
-- **desktop-commander** - run .exe, shell commands, process management
 - **serena** - semantic code analysis and refactoring
-
-### QA и тестирование с MCP
-
-#### Playwright (браузерная автоматизация)
-Использовать для:
-- **E2E тесты веб-интерфейса** - навигация, клики, заполнение форм
-- **Скриншоты UI** - `browser_take_screenshot` для визуальной проверки
-- **Проверка состояния страницы** - `browser_snapshot` возвращает accessibility tree
-- **Тестирование форм** - `browser_fill_form` для множественных полей
-- **Ожидание элементов** - `browser_wait_for` для асинхронных операций
-
-Пример E2E теста:
-```
-1. browser_navigate → открыть приложение
-2. browser_snapshot → проверить загрузку UI
-3. browser_click → нажать кнопку "Find Button"
-4. browser_wait_for → ждать появления устройства
-5. browser_take_screenshot → сохранить результат
-```
-
-#### Desktop Commander (системные операции)
-Использовать для:
-- **Запуск приложения** - `start_process("npm run tauri:dev")`
-- **Проверка процессов** - `list_processes`, `list_sessions`
-- **Чтение логов** - `read_file` с offset для tail-подобного чтения
-- **Поиск файлов** - `start_search` для поиска по имени или содержимому
-- **Завершение процессов** - `force_terminate`, `kill_process`
-
-Пример тестового сценария:
-```
-1. start_process("npm run tauri:build") → собрать приложение
-2. read_process_output(pid) → проверить успешность сборки
-3. start_process("./target/release/app.exe") → запустить
-4. list_processes → убедиться что процесс работает
-5. [тесты через playwright]
-6. force_terminate(pid) → завершить
-```
-
-#### Комбинированное тестирование
-Для полного E2E теста USB Configurator:
-1. **Desktop Commander**: запустить `npm run tauri:dev`
-2. **Desktop Commander**: дождаться готовности (read_process_output)
-3. **Playwright**: открыть http://localhost:5000
-4. **Playwright**: выполнить UI тесты
-5. **Desktop Commander**: проверить логи приложения
-6. **Desktop Commander**: завершить процесс
 
 ## Rules
 
@@ -289,36 +239,114 @@ Use these MCP servers:
 - [2024-12-02] Added Hotkeys preset category (Ctrl+C, Ctrl+V, Ctrl+Z, etc.)
 - [2024-12-02] Added unit tests for parse_arguments (8 tests passing)
 - [2024-12-02] Setup Playwright E2E test framework
+- [2024-12-02] Created Tauri E2E testing with Playwright + CDP (solved tauri-driver empty page issue)
+- [2024-12-02] Added smoke test for app launch verification
+- [2024-12-02] Added full E2E test with 11 checks (device selection, config, save, actions)
+- [2024-12-02] Added interactive mode with sound alerts for physical button testing
 
 ## New Files (2024-12-02)
 - `src-tauri/src/hotkey.rs` - Windows SendInput API for hotkey simulation
-- `tests/e2e/app.spec.ts` - Playwright E2E tests
+- `tests/e2e/app.spec.ts` - Playwright E2E tests (frontend)
+- `tests/tauri/smoke.test.ts` - App launch smoke test
+- `tests/tauri/full-e2e.test.ts` - Full E2E with CDP, interactive mode
+- `tests/tauri/tauri-playwright.test.ts` - Basic CDP connection test
 - `playwright.config.ts` - Playwright configuration
+- `wdio.conf.ts` - WebDriverIO config (experimental, has issues)
 
 ## Testing Commands
 ```bash
-# Run Rust unit tests
-npm run test
-
-# Run E2E tests (requires: npm install && npx playwright install chromium)
-npm run test:e2e
-
-# Run E2E tests with UI
-npm run test:e2e:ui
+# Run ALL tests
+npm run test              # Rust unit tests (13 tests)
+npm run check             # TypeScript type checker
+npm run test:e2e          # Playwright frontend tests (5 tests)
+npm run test:smoke        # Tauri app smoke test (6 tests)
+npm run test:e2e:full     # Full E2E with CDP (11 tests) - AUTOMATED
+npm run test:e2e:interactive  # Full E2E with physical button prompts
 ```
 
-## Next Steps (Phase 2)
-1. **Device disconnection handling** - cleanup when device disconnects
-2. **Double-press/Long-press detection** - advanced trigger types in RawInputMonitor
-3. **Unit tests for HID manager** - test device enumeration, status tracking
-4. **Documentation** - troubleshooting guide in README
+### Tauri E2E Testing (Playwright + CDP)
+
+**Problem solved:** `tauri-driver` shows empty page with Tauri 2.x.
+
+**Solution:** Use Playwright connecting directly to WebView2 via Chrome DevTools Protocol (CDP).
+
+How it works:
+1. Test launches `usb-configurator.exe` with env var `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`
+2. Playwright connects via `chromium.connectOverCDP("http://127.0.0.1:9222")`
+3. Full DOM access - clicks, inputs, screenshots all work
+
+Test files:
+- `tests/tauri/smoke.test.ts` - Basic app launch verification
+- `tests/tauri/full-e2e.test.ts` - Complete UI testing with CDP
+- `tests/tauri/tauri-playwright.test.ts` - Simple CDP connection test
+
+### Interactive Mode
+For testing physical USB button detection:
+```bash
+npm run test:e2e:interactive
+```
+This mode:
+- Plays sound alert (Windows beep) when action needed
+- Prompts user to press physical button on USB device
+- Waits for ENTER or timeout (30 sec)
+- Verifies device was detected
+
+### Test Coverage
+| Test | What it verifies |
+|------|------------------|
+| Rust unit tests | Argument parsing, config, types |
+| TypeScript check | Type safety across frontend |
+| Playwright E2E | Frontend components in browser |
+| Smoke test | App launches and runs without crash |
+| Full E2E | Device selection, config, save, actions, logs |
+| Interactive | Physical button → device detection flow |
+
+## Next Steps
+1. ~~Device disconnection handling~~ ✅ Done
+2. ~~Double-press/Long-press detection~~ ✅ Done
+3. ~~Unit tests~~ ✅ Done (13 Rust + 5 Playwright + 11 E2E)
+4. ~~Documentation~~ ✅ Done (README troubleshooting)
 
 ## Known Issues
 - [SOLVED 2024-11-29] Events from backend not reaching frontend - reason: tauri-bridge.ts used only mock event system. Fixed by adding `listen()` from `@tauri-apps/api/event`
 - [SOLVED 2024-11-29] System Log panel not updating - reason: `TauriBridge.addLog()` emits to mock eventListeners, but `TauriBridge.on()` in Tauri mode uses real Tauri events (different systems!). Fixed by updating React state directly in `addLog` callback.
 - [SOLVED 2024-11-29] Device not highlighted after "Find Button" success - reason: `handleSelectDevice` called from useEffect with `[]` deps has stale `devices` closure (empty array). Fixed by using `setSelectedDeviceId()` directly instead of `handleSelectDevice()`.
+- [SOLVED 2024-12-02] tauri-driver + WebDriverIO shows empty page - tauri-driver with Tauri 2.x opens Edge but doesn't load app content. **Solution:** Use Playwright with CDP connection directly to WebView2 (`chromium.connectOverCDP`). Set env var `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` before launching app.
+- [SOLVED 2024-12-02] Windows UI Automation only sees system buttons - WebView2 doesn't expose DOM through Windows Accessibility API. Only window chrome (Minimize/Maximize/Close) is accessible. **Solution:** Use CDP for full DOM access.
 
 ## Common Pitfalls
+
+### Tauri E2E Testing with CDP (Important!)
+To test a Tauri 2.x app with Playwright:
+
+```typescript
+// 1. Launch app with remote debugging enabled
+const env = {
+  ...process.env,
+  WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9222',
+};
+const appProcess = spawn(APP_PATH, [], { env });
+
+// 2. Wait for CDP port
+await fetch('http://127.0.0.1:9222/json/version'); // retry until available
+
+// 3. Connect Playwright
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
+const page = browser.contexts()[0].pages()[0];
+
+// 4. Now you have full DOM access!
+await page.click('button:has-text("Find Button")');
+```
+
+**DO NOT use:** `tauri-driver` + WebDriverIO (shows empty page with Tauri 2.x)
+**DO NOT use:** Windows UI Automation (only sees window chrome, not WebView content)
+
+### Interactive Testing for Physical Devices
+When testing requires physical button press:
+- Use `--interactive` flag: `npm run test:e2e:interactive`
+- Test plays beep sound to alert user
+- Waits for user to press ENTER after physical action
+- 30 second timeout by default
 
 ### TauriBridge Dual Event Systems
 `tauri-bridge.ts` has TWO separate event systems that don't communicate:

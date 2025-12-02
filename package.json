@@ -15,7 +15,11 @@
     "test": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:tauri": "wdio run wdio.conf.ts"
+    "test:tauri": "wdio run wdio.conf.ts",
+    "test:smoke": "npx tsx tests/tauri/smoke.test.ts",
+    "test:e2e:tauri": "npx tsx tests/tauri/tauri-playwright.test.ts",
+    "test:e2e:full": "npx tsx tests/tauri/full-e2e.test.ts",
+    "test:e2e:interactive": "npx tsx tests/tauri/full-e2e.test.ts --interactive"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

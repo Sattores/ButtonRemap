@@ -39,3 +39,4 @@ windows = { version = "0.58", features = [
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+e2e-testing = []  # Enable remote debugging for E2E tests

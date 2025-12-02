@@ -182,7 +182,49 @@ npm run test:e2e
 npm run test:e2e:ui
 ```
 
-### Tauri E2E Tests (WebDriverIO)
+### Tauri Smoke Test
+
+Run a quick smoke test to verify the application launches and runs correctly:
+
+```bash
+npm run test:smoke
+```
+
+This test verifies:
+- The executable exists
+- Application starts without crashing
+- Application runs stably for 5 seconds
+- Process is visible in system tasklist
+- Application terminates cleanly
+
+### Tauri E2E Test (Playwright + CDP)
+
+Run full E2E tests with Playwright connecting to WebView2 via Chrome DevTools Protocol:
+
+```bash
+# Automated mode (no physical interaction required)
+npm run test:e2e:full
+
+# Interactive mode (requires physical button press)
+npm run test:e2e:interactive
+```
+
+**Automated mode** tests:
+- Launches the Tauri application
+- Connects to WebView2 via CDP (port 9222)
+- Tests UI elements and button clicks
+- Verifies backend IPC communication works
+- Takes screenshots
+
+**Interactive mode** additionally:
+- Plays sound alert when action is needed
+- Prompts user to press physical USB button
+- Verifies device detection works end-to-end
+- Tests real hardware interaction
+
+**Note:** This is the recommended approach for full E2E testing of Tauri apps on Windows.
+
+### Tauri E2E Tests (WebDriverIO) - Experimental
 
 Run full application E2E tests with WebDriverIO and tauri-driver:
 
@@ -201,6 +243,8 @@ Run full application E2E tests with WebDriverIO and tauri-driver:
    ```bash
    npm run test:tauri
    ```
+
+**Note:** WebDriverIO + tauri-driver integration with Tauri 2.x may have compatibility issues. The smoke test is recommended for CI/CD pipelines.
 
 ### Testing Actions in Code
 
