@@ -277,6 +277,34 @@ Use these MCP servers:
 - [2024-11-29] Fixed System Log panel - logs now update via direct React state
 - [2024-11-29] Added log entries: preset applied, application selected, logs copied/exported
 - [2024-11-29] Updated icons: icon-256.png for header, icon-64.png for tray
+- [2024-12-02] Added hotkey simulation via Windows SendInput API (`src-tauri/src/hotkey.rs`)
+- [2024-12-02] Fixed argument parsing for paths with spaces (`parse_arguments()` function)
+- [2024-12-02] Added Hotkeys preset category (Ctrl+C, Ctrl+V, Ctrl+Z, etc.)
+- [2024-12-02] Added unit tests for parse_arguments (8 tests passing)
+- [2024-12-02] Setup Playwright E2E test framework
+
+## New Files (2024-12-02)
+- `src-tauri/src/hotkey.rs` - Windows SendInput API for hotkey simulation
+- `tests/e2e/app.spec.ts` - Playwright E2E tests
+- `playwright.config.ts` - Playwright configuration
+
+## Testing Commands
+```bash
+# Run Rust unit tests
+npm run test
+
+# Run E2E tests (requires: npm install && npx playwright install chromium)
+npm run test:e2e
+
+# Run E2E tests with UI
+npm run test:e2e:ui
+```
+
+## Next Steps (Phase 2)
+1. **Device disconnection handling** - cleanup when device disconnects
+2. **Double-press/Long-press detection** - advanced trigger types in RawInputMonitor
+3. **Unit tests for HID manager** - test device enumeration, status tracking
+4. **Documentation** - troubleshooting guide in README
 
 ## Known Issues
 - [SOLVED 2024-11-29] Events from backend not reaching frontend - reason: tauri-bridge.ts used only mock event system. Fixed by adding `listen()` from `@tauri-apps/api/event`
