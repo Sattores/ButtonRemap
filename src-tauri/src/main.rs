@@ -11,6 +11,9 @@ mod types;
 mod rawinput;
 
 #[cfg(windows)]
+mod hotkey;
+
+#[cfg(windows)]
 mod listener;
 
 use config::ConfigManager;

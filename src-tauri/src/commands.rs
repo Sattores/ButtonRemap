@@ -6,6 +6,32 @@ use crate::AppState;
 use std::process::Command;
 use tauri::{Emitter, State};
 
+/// Parse arguments string respecting quoted sections
+fn parse_arguments(args: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+
+    for c in args.chars() {
+        match c {
+            '"' => in_quotes = !in_quotes,
+            ' ' | '\t' if !in_quotes => {
+                if !current.is_empty() {
+                    result.push(current.clone());
+                    current.clear();
+                }
+            }
+            _ => current.push(c),
+        }
+    }
+
+    if !current.is_empty() {
+        result.push(current);
+    }
+
+    result
+}
+
 // ============================================
 // Device Commands
 // ============================================
@@ -313,18 +339,19 @@ pub async fn test_action(
             if cfg!(target_os = "windows") {
                 Command::new("cmd")
                     .args(["/C", &action.executable_path])
-                    .args(action.arguments.split_whitespace())
+                    .args(parse_arguments(&action.arguments))
                     .spawn()
             } else {
                 Command::new(&action.executable_path)
-                    .args(action.arguments.split_whitespace())
+                    .args(parse_arguments(&action.arguments))
                     .spawn()
             }
         }
         crate::types::ActionType::SystemCommand => {
             if cfg!(target_os = "windows") {
                 Command::new("cmd")
-                    .args(["/C", &action.executable_path, &action.arguments])
+                    .args(["/C", &action.executable_path])
+                    .args(parse_arguments(&action.arguments))
                     .spawn()
             } else {
                 Command::new("sh")
@@ -333,9 +360,32 @@ pub async fn test_action(
             }
         }
         crate::types::ActionType::Hotkey => {
-            // Hotkey simulation would require Windows API
-            log::info!("Hotkey simulation not implemented in test mode");
-            return Ok(IpcResult::ok_empty());
+            // Execute hotkey using Windows SendInput API
+            #[cfg(target_os = "windows")]
+            {
+                match crate::hotkey::execute_hotkey(&action.executable_path) {
+                    Ok(_) => {
+                        config.add_log(
+                            LogEntryLevel::Success,
+                            format!("Hotkey executed: {}", action.executable_path),
+                            Some("Test".to_string()),
+                        );
+                        return Ok(IpcResult::ok_empty());
+                    }
+                    Err(e) => {
+                        config.add_log(
+                            LogEntryLevel::Error,
+                            format!("Hotkey failed: {}", e),
+                            Some("Test".to_string()),
+                        );
+                        return Ok(IpcResult::err(e));
+                    }
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                return Ok(IpcResult::err("Hotkey simulation only supported on Windows".to_string()));
+            }
         }
     };
     

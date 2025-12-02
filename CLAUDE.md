@@ -174,6 +174,55 @@ Use these MCP servers:
 - **memory** - save important decisions and context
 - **sequential-thinking** - for tasks with >3 steps
 - **context7** - library documentation search
+- **playwright** - browser automation, E2E testing
+- **desktop-commander** - run .exe, shell commands, process management
+- **serena** - semantic code analysis and refactoring
+
+### QA и тестирование с MCP
+
+#### Playwright (браузерная автоматизация)
+Использовать для:
+- **E2E тесты веб-интерфейса** - навигация, клики, заполнение форм
+- **Скриншоты UI** - `browser_take_screenshot` для визуальной проверки
+- **Проверка состояния страницы** - `browser_snapshot` возвращает accessibility tree
+- **Тестирование форм** - `browser_fill_form` для множественных полей
+- **Ожидание элементов** - `browser_wait_for` для асинхронных операций
+
+Пример E2E теста:
+```
+1. browser_navigate → открыть приложение
+2. browser_snapshot → проверить загрузку UI
+3. browser_click → нажать кнопку "Find Button"
+4. browser_wait_for → ждать появления устройства
+5. browser_take_screenshot → сохранить результат
+```
+
+#### Desktop Commander (системные операции)
+Использовать для:
+- **Запуск приложения** - `start_process("npm run tauri:dev")`
+- **Проверка процессов** - `list_processes`, `list_sessions`
+- **Чтение логов** - `read_file` с offset для tail-подобного чтения
+- **Поиск файлов** - `start_search` для поиска по имени или содержимому
+- **Завершение процессов** - `force_terminate`, `kill_process`
+
+Пример тестового сценария:
+```
+1. start_process("npm run tauri:build") → собрать приложение
+2. read_process_output(pid) → проверить успешность сборки
+3. start_process("./target/release/app.exe") → запустить
+4. list_processes → убедиться что процесс работает
+5. [тесты через playwright]
+6. force_terminate(pid) → завершить
+```
+
+#### Комбинированное тестирование
+Для полного E2E теста USB Configurator:
+1. **Desktop Commander**: запустить `npm run tauri:dev`
+2. **Desktop Commander**: дождаться готовности (read_process_output)
+3. **Playwright**: открыть http://localhost:5000
+4. **Playwright**: выполнить UI тесты
+5. **Desktop Commander**: проверить логи приложения
+6. **Desktop Commander**: завершить процесс
 
 ## Rules
 

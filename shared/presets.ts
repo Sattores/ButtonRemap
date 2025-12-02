@@ -96,6 +96,100 @@ export const DEFAULT_PRESETS: PresetCategory[] = [
     ],
   },
   {
+    id: "hotkeys",
+    name: "Hotkeys",
+    items: [
+      {
+        id: "copy",
+        name: "Copy (Ctrl+C)",
+        icon: "Copy",
+        iconColor: "text-foreground",
+        action: {
+          type: "hotkey",
+          executablePath: "Ctrl+C",
+          arguments: "",
+        },
+      },
+      {
+        id: "paste",
+        name: "Paste (Ctrl+V)",
+        icon: "Clipboard",
+        iconColor: "text-foreground",
+        action: {
+          type: "hotkey",
+          executablePath: "Ctrl+V",
+          arguments: "",
+        },
+      },
+      {
+        id: "undo",
+        name: "Undo (Ctrl+Z)",
+        icon: "Undo",
+        iconColor: "text-foreground",
+        action: {
+          type: "hotkey",
+          executablePath: "Ctrl+Z",
+          arguments: "",
+        },
+      },
+      {
+        id: "redo",
+        name: "Redo (Ctrl+Y)",
+        icon: "Redo",
+        iconColor: "text-foreground",
+        action: {
+          type: "hotkey",
+          executablePath: "Ctrl+Y",
+          arguments: "",
+        },
+      },
+      {
+        id: "select-all",
+        name: "Select All (Ctrl+A)",
+        icon: "CheckSquare",
+        iconColor: "text-foreground",
+        action: {
+          type: "hotkey",
+          executablePath: "Ctrl+A",
+          arguments: "",
+        },
+      },
+      {
+        id: "save",
+        name: "Save (Ctrl+S)",
+        icon: "Save",
+        iconColor: "text-foreground",
+        action: {
+          type: "hotkey",
+          executablePath: "Ctrl+S",
+          arguments: "",
+        },
+      },
+      {
+        id: "task-manager",
+        name: "Task Manager (Ctrl+Shift+Esc)",
+        icon: "Activity",
+        iconColor: "text-foreground",
+        action: {
+          type: "hotkey",
+          executablePath: "Ctrl+Shift+Escape",
+          arguments: "",
+        },
+      },
+      {
+        id: "alt-tab",
+        name: "Switch Window (Alt+Tab)",
+        icon: "Layers",
+        iconColor: "text-foreground",
+        action: {
+          type: "hotkey",
+          executablePath: "Alt+Tab",
+          arguments: "",
+        },
+      },
+    ],
+  },
+  {
     id: "system",
     name: "System Controls",
     items: [

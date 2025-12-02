@@ -5,6 +5,41 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+/// Parse arguments string respecting quoted sections
+/// Examples:
+///   `arg1 arg2` -> ["arg1", "arg2"]
+///   `"path with spaces" arg2` -> ["path with spaces", "arg2"]
+///   `arg1 "quoted arg"` -> ["arg1", "quoted arg"]
+fn parse_arguments(args: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut chars = args.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                in_quotes = !in_quotes;
+            }
+            ' ' | '\t' if !in_quotes => {
+                if !current.is_empty() {
+                    result.push(current.clone());
+                    current.clear();
+                }
+            }
+            _ => {
+                current.push(c);
+            }
+        }
+    }
+
+    if !current.is_empty() {
+        result.push(current);
+    }
+
+    result
+}
+
 /// Background listener that monitors for device input and executes configured actions
 pub struct BackgroundListener {
     config_manager: Arc<Mutex<ConfigManager>>,
@@ -92,7 +127,7 @@ impl BackgroundListener {
                 // Launch executable directly (supports paths with spaces)
                 let mut cmd = Command::new(&action.executable_path);
                 if !action.arguments.is_empty() {
-                    cmd.args(action.arguments.split_whitespace());
+                    cmd.args(parse_arguments(&action.arguments));
                 }
                 cmd.spawn()
             }
@@ -101,18 +136,38 @@ impl BackgroundListener {
                 let quoted_path = format!("\"{}\"", action.executable_path);
                 Command::new("cmd")
                     .args(["/C", &quoted_path])
-                    .args(action.arguments.split_whitespace())
+                    .args(parse_arguments(&action.arguments))
                     .spawn()
             }
             ActionType::SystemCommand => {
                 // Run system command through cmd
                 Command::new("cmd")
                     .args(["/C", &action.executable_path])
-                    .args(action.arguments.split_whitespace())
+                    .args(parse_arguments(&action.arguments))
                     .spawn()
             }
             ActionType::Hotkey => {
-                log::info!("Hotkey action not yet implemented");
+                // Execute hotkey and log result separately (doesn't spawn process)
+                match crate::hotkey::execute_hotkey(&action.executable_path) {
+                    Ok(_) => {
+                        if let Ok(mut config) = self.config_manager.lock() {
+                            config.add_log(
+                                LogEntryLevel::Success,
+                                format!("Hotkey executed: {}", action.executable_path),
+                                Some(device_id.to_string()),
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        if let Ok(mut config) = self.config_manager.lock() {
+                            config.add_log(
+                                LogEntryLevel::Error,
+                                format!("Hotkey failed: {}", e),
+                                Some(device_id.to_string()),
+                            );
+                        }
+                    }
+                }
                 return;
             }
         };
