@@ -47,20 +47,39 @@ pub async fn list_devices(state: State<'_, AppState>) -> Result<IpcResult<Vec<Hi
 }
 
 #[tauri::command]
-pub async fn refresh_devices(state: State<'_, AppState>) -> Result<IpcResult<Vec<HidDevice>>, String> {
+pub async fn refresh_devices(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<IpcResult<Vec<HidDevice>>, String> {
     let mut hid = state.hid_manager.lock().map_err(|e| e.to_string())?;
-    
-    match hid.refresh_devices() {
-        Ok(devices) => {
+
+    match hid.refresh_devices_with_disconnections() {
+        Ok(result) => {
             // Log the refresh
             let mut config = state.config_manager.lock().map_err(|e| e.to_string())?;
             config.add_log(
                 LogEntryLevel::Info,
-                format!("Found {} HID devices", devices.len()),
+                format!("Found {} HID devices", result.devices.len()),
                 Some("HID".to_string()),
             );
-            
-            Ok(IpcResult::ok(devices))
+
+            // Emit events for disconnected devices
+            for device_id in &result.disconnected_ids {
+                config.add_log(
+                    LogEntryLevel::Warn,
+                    format!("Device disconnected: {}", device_id),
+                    Some(device_id.clone()),
+                );
+
+                // Emit event to frontend
+                if let Err(e) = app.emit("device-disconnected", serde_json::json!({
+                    "deviceId": device_id
+                })) {
+                    log::error!("Failed to emit device-disconnected event: {}", e);
+                }
+            }
+
+            Ok(IpcResult::ok(result.devices))
         }
         Err(e) => Ok(IpcResult::err(e.to_string())),
     }

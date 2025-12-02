@@ -1,6 +1,7 @@
 use crate::input_monitor::InputMonitor;
 use crate::types::{DeviceStatus, HidDevice, MonitoringState};
 use hidapi::{HidApi, HidDevice as RawHidDevice};
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
@@ -20,41 +21,54 @@ pub enum HidError {
     ReadError(String),
 }
 
+/// Result of device refresh, containing both current and disconnected devices
+#[derive(Debug, Clone)]
+pub struct DeviceRefreshResult {
+    pub devices: Vec<HidDevice>,
+    pub disconnected_ids: Vec<String>,
+}
+
 pub struct HidManager {
     api: HidApi,
     monitoring_active: Arc<AtomicBool>,
     configured_devices: Vec<String>, // Device IDs that have bindings
+    previous_devices: HashSet<String>, // Track previously seen device IDs for disconnection detection
 }
 
 impl HidManager {
     pub fn new() -> Result<Self, HidError> {
         let api = HidApi::new().map_err(|e| HidError::InitError(e.to_string()))?;
-        
+
         Ok(Self {
             api,
             monitoring_active: Arc::new(AtomicBool::new(false)),
             configured_devices: Vec::new(),
+            previous_devices: HashSet::new(),
         })
     }
 
     pub fn list_devices(&mut self) -> Result<Vec<HidDevice>, HidError> {
         // Refresh device list
         self.api.refresh_devices().map_err(|e| HidError::InitError(e.to_string()))?;
-        
+
         let mut devices = Vec::new();
-        
+        let mut current_device_ids = HashSet::new();
+
         for device_info in self.api.device_list() {
             let vendor_id = format!("{:04X}", device_info.vendor_id());
             let product_id = format!("{:04X}", device_info.product_id());
             let device_id = format!("{}:{}", vendor_id, product_id);
-            
+
+            // Track current device IDs
+            current_device_ids.insert(device_id.clone());
+
             // Determine status based on whether we have a binding
             let status = if self.configured_devices.contains(&device_id) {
                 DeviceStatus::Configured
             } else {
                 DeviceStatus::Connected
             };
-            
+
             let device = HidDevice {
                 id: device_id,
                 name: device_info
@@ -69,14 +83,81 @@ impl HidManager {
                 manufacturer: device_info.manufacturer_string().map(|s| s.to_string()),
                 serial_number: device_info.serial_number().map(|s| s.to_string()),
             };
-            
+
             // Avoid duplicates (same VID:PID)
             if !devices.iter().any(|d: &HidDevice| d.id == device.id) {
                 devices.push(device);
             }
         }
-        
+
+        // Update previous devices for next comparison
+        self.previous_devices = current_device_ids;
+
         Ok(devices)
+    }
+
+    /// Refresh devices and detect disconnections
+    pub fn refresh_devices_with_disconnections(&mut self) -> Result<DeviceRefreshResult, HidError> {
+        // Refresh device list
+        self.api.refresh_devices().map_err(|e| HidError::InitError(e.to_string()))?;
+
+        let mut devices = Vec::new();
+        let mut current_device_ids = HashSet::new();
+
+        for device_info in self.api.device_list() {
+            let vendor_id = format!("{:04X}", device_info.vendor_id());
+            let product_id = format!("{:04X}", device_info.product_id());
+            let device_id = format!("{}:{}", vendor_id, product_id);
+
+            // Track current device IDs
+            current_device_ids.insert(device_id.clone());
+
+            // Determine status based on whether we have a binding
+            let status = if self.configured_devices.contains(&device_id) {
+                DeviceStatus::Configured
+            } else {
+                DeviceStatus::Connected
+            };
+
+            let device = HidDevice {
+                id: device_id,
+                name: device_info
+                    .product_string()
+                    .unwrap_or("Unknown Device")
+                    .to_string(),
+                vendor_id,
+                product_id,
+                interface_number: device_info.interface_number() as u8,
+                total_interfaces: 1,
+                status,
+                manufacturer: device_info.manufacturer_string().map(|s| s.to_string()),
+                serial_number: device_info.serial_number().map(|s| s.to_string()),
+            };
+
+            // Avoid duplicates (same VID:PID)
+            if !devices.iter().any(|d: &HidDevice| d.id == device.id) {
+                devices.push(device);
+            }
+        }
+
+        // Find disconnected devices (were in previous but not in current)
+        let disconnected_ids: Vec<String> = self.previous_devices
+            .difference(&current_device_ids)
+            .cloned()
+            .collect();
+
+        // Log disconnections
+        for id in &disconnected_ids {
+            log::info!("Device disconnected: {}", id);
+        }
+
+        // Update previous devices for next comparison
+        self.previous_devices = current_device_ids;
+
+        Ok(DeviceRefreshResult {
+            devices,
+            disconnected_ids,
+        })
     }
 
     pub fn refresh_devices(&mut self) -> Result<Vec<HidDevice>, HidError> {

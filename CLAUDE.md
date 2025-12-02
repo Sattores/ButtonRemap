@@ -154,6 +154,13 @@ The build scripts (`build.bat`, `setup-tauri.ps1`) copy the `.tauri` versions wh
 - Build requires Visual Studio Build Tools with "Desktop development with C++"
 - Rust toolchain must be installed via rustup
 
+### Before Testing (CRITICAL)
+**ALWAYS close old app instances before starting the dev server:**
+```bash
+cmd /c "taskkill /F /IM usb-configurator.exe 2>nul & taskkill /F /IM node.exe 2>nul & echo Done"
+```
+This prevents port conflicts and stale process issues.
+
 ## Testing Actions
 
 Use the `test_action` IPC command to execute actions without saving bindings:

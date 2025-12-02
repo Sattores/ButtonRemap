@@ -140,13 +140,15 @@ export default function Dashboard() {
     loadData();
 
     // Subscribe to log events
-    const unsubscribe = TauriBridge.on(IPC_EVENTS.LOG_ENTRY, (entry: LogEntry) => {
+    const unsubscribe = TauriBridge.on(IPC_EVENTS.LOG_ENTRY, (data) => {
+      const entry = data as LogEntry;
       setLogs(prev => [entry, ...prev].slice(0, 50));
     });
 
     // Subscribe to monitoring detection
     console.log("🔔 [Dashboard] Setting up event listener for:", IPC_EVENTS.MONITORING_DETECTED);
-    const unsubMonitor = TauriBridge.on(IPC_EVENTS.MONITORING_DETECTED, (data: { device: HidDevice }) => {
+    const unsubMonitor = TauriBridge.on(IPC_EVENTS.MONITORING_DETECTED, (rawData) => {
+      const data = rawData as { device: HidDevice };
       console.log("📥📥📥 [Dashboard] ✅✅✅ MONITORING EVENT RECEIVED! ✅✅✅ 📥📥📥");
       console.log("📥 [Dashboard] Event data:", data);
       console.log("📥 [Dashboard] Device:", data.device);
@@ -186,9 +188,37 @@ export default function Dashboard() {
     });
     console.log("🔔 [Dashboard] Event listener registered for:", IPC_EVENTS.MONITORING_DETECTED);
 
+    // Subscribe to device disconnection events
+    const unsubDisconnect = TauriBridge.on(IPC_EVENTS.DEVICE_DISCONNECTED, (rawData) => {
+      const data = rawData as { deviceId: string };
+      console.log("🔌 [Dashboard] Device disconnected:", data.deviceId);
+
+      // Update device status in list
+      setDevices(prev => prev.map(d =>
+        d.id === data.deviceId
+          ? { ...d, status: "disconnected" as const }
+          : d
+      ));
+
+      // If the disconnected device was selected, show a toast
+      setSelectedDeviceId(current => {
+        if (current === data.deviceId) {
+          toast({
+            title: "Device Disconnected",
+            description: `The selected device (${data.deviceId}) was disconnected`,
+            variant: "destructive",
+          });
+        }
+        return current;
+      });
+
+      addLog("warn", `Device disconnected: ${data.deviceId}`, "HID");
+    });
+
     return () => {
       unsubscribe();
       unsubMonitor();
+      unsubDisconnect();
     };
   }, []);
 
