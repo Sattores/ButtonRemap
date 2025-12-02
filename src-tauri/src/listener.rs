@@ -14,22 +14,17 @@ fn parse_arguments(args: &str) -> Vec<String> {
     let mut result = Vec::new();
     let mut current = String::new();
     let mut in_quotes = false;
-    let mut chars = args.chars().peekable();
 
-    while let Some(c) = chars.next() {
+    for c in args.chars() {
         match c {
-            '"' => {
-                in_quotes = !in_quotes;
-            }
+            '"' => in_quotes = !in_quotes,
             ' ' | '\t' if !in_quotes => {
                 if !current.is_empty() {
                     result.push(current.clone());
                     current.clear();
                 }
             }
-            _ => {
-                current.push(c);
-            }
+            _ => current.push(c),
         }
     }
 
@@ -38,6 +33,41 @@ fn parse_arguments(args: &str) -> Vec<String> {
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_simple_args() {
+        let result = parse_arguments("arg1 arg2 arg3");
+        assert_eq!(result, vec!["arg1", "arg2", "arg3"]);
+    }
+
+    #[test]
+    fn test_parse_quoted_path() {
+        let result = parse_arguments("\"C:\\Program Files\\App\\app.exe\" --flag");
+        assert_eq!(result, vec!["C:\\Program Files\\App\\app.exe", "--flag"]);
+    }
+
+    #[test]
+    fn test_parse_mixed_args() {
+        let result = parse_arguments("normal \"quoted arg\" another");
+        assert_eq!(result, vec!["normal", "quoted arg", "another"]);
+    }
+
+    #[test]
+    fn test_parse_empty() {
+        let result = parse_arguments("");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_parse_multiple_spaces() {
+        let result = parse_arguments("arg1    arg2");
+        assert_eq!(result, vec!["arg1", "arg2"]);
+    }
 }
 
 /// Background listener that monitors for device input and executes configured actions
