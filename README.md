@@ -160,7 +160,49 @@ Configuration includes:
 - Button-to-action mappings
 - Action parameters (paths, arguments, etc.)
 
-## Testing Actions
+## Testing
+
+### Unit Tests (Rust)
+
+Run Rust unit tests for the backend:
+
+```bash
+npm run test
+# or
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+### E2E Tests (Playwright)
+
+Run frontend E2E tests with Playwright (tests the UI in browser):
+
+```bash
+npm run test:e2e
+# or with UI mode
+npm run test:e2e:ui
+```
+
+### Tauri E2E Tests (WebDriverIO)
+
+Run full application E2E tests with WebDriverIO and tauri-driver:
+
+**Prerequisites:**
+1. Build the release version first:
+   ```bash
+   npm run tauri:build
+   ```
+
+2. Install [MSEdge WebDriver](https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/) matching your Edge version:
+   - Check Edge version: `"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --version`
+   - Download matching driver from the link above
+   - Add `msedgedriver.exe` to your PATH
+
+3. Run the tests:
+   ```bash
+   npm run test:tauri
+   ```
+
+### Testing Actions in Code
 
 You can test actions without saving bindings:
 

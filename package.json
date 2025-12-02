@@ -14,7 +14,8 @@
     "tauri:build": "tauri build",
     "test": "cargo test --manifest-path src-tauri/Cargo.toml",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:tauri": "wdio run wdio.conf.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -76,6 +77,11 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "@wdio/cli": "^9.21.1",
+    "@wdio/local-runner": "^9.21.0",
+    "@wdio/mocha-framework": "^9.21.0",
+    "@wdio/selenium-standalone-service": "^8.14.0",
+    "@wdio/spec-reporter": "^9.20.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
