@@ -174,6 +174,88 @@ await TauriBridge.testAction({
 });
 ```
 
+## Troubleshooting
+
+### Device Not Detected
+
+**Problem**: Your USB device doesn't appear in the device list.
+
+**Solutions**:
+1. **Refresh the device list** - Click the refresh button in the UI
+2. **Check USB connection** - Try a different USB port
+3. **Restart the application** - Close and reopen ButtonRemap
+4. **Check permissions** - Run the application as Administrator
+
+### "Find Button" Not Working
+
+**Problem**: Pressing the button doesn't detect the device.
+
+**Solutions**:
+1. **Keyboard-emulating devices**: Some USB buttons (like XFKEY) emulate keyboards. They should work automatically.
+2. **Raw HID devices**: May require the application to be run as Administrator
+3. **Device conflicts**: Close other applications that might be using the device
+
+### Actions Not Executing
+
+**Problem**: Button press is detected but action doesn't run.
+
+**Solutions**:
+1. **Check the binding is enabled** - Look for the enabled toggle in configuration
+2. **Verify executable path** - Ensure the path exists and is correct
+3. **Paths with spaces** - Paths containing spaces are supported but double-check formatting
+4. **Check System Log** - The log panel shows execution results and errors
+5. **Trigger type mismatch** - If using double-press, make sure to press twice quickly (within 400ms)
+
+### Hotkey Actions
+
+**Problem**: Hotkey simulation not working.
+
+**Solutions**:
+1. **Use correct format**: Hotkeys should be formatted like `Ctrl+Shift+V` or `Alt+Tab`
+2. **Supported modifiers**: `Ctrl`, `Alt`, `Shift`, `Win`
+3. **Test first**: Use the "Test" button to verify the hotkey works
+4. **Run as Administrator**: Some hotkeys require elevated permissions
+
+### Application Crashes on Startup
+
+**Solutions**:
+1. **Reset configuration**: Delete `%APPDATA%\usb-configurator\` folder
+2. **Check for port conflicts**: Kill any existing instances:
+   ```bash
+   taskkill /F /IM usb-configurator.exe
+   ```
+3. **Reinstall**: Download the latest version from releases
+
+### Common Error Messages
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Failed to initialize HID API" | HID library issue | Reinstall the application |
+| "Device not found" | Device disconnected | Reconnect the device |
+| "Action failed" | Invalid path/command | Check the executable path |
+| "Hotkey failed" | Invalid hotkey format | Use format like `Ctrl+C` |
+
+### Debug Mode
+
+For advanced troubleshooting, run with debug logging:
+
+```bash
+set RUST_LOG=debug
+npm run tauri:dev
+```
+
+This will output detailed logs to the console including device detection events and action execution.
+
+### Getting Help
+
+If you're still having issues:
+1. Check the [Issues](https://github.com/Sattores/ButtonRemap/issues) page
+2. Create a new issue with:
+   - Your Windows version
+   - Device name and VID:PID
+   - Steps to reproduce
+   - Error messages from System Log
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
