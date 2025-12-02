@@ -1,9 +1,11 @@
 use crate::config::ConfigManager;
 use crate::rawinput::RawInputMonitor;
-use crate::types::{ActionConfig, ActionType, LogEntryLevel};
+use crate::types::{ActionConfig, ActionType, LogEntryLevel, TriggerType};
+use std::collections::HashMap;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 /// Parse arguments string respecting quoted sections
 /// Examples:
@@ -70,6 +72,25 @@ mod tests {
     }
 }
 
+/// Constants for trigger detection
+const DOUBLE_PRESS_WINDOW_MS: u64 = 400; // Max time between presses for double-press
+
+/// Tracks button press state for a device
+#[derive(Debug)]
+struct DevicePressState {
+    last_press_time: Instant,
+    press_count: u32,
+}
+
+impl DevicePressState {
+    fn new() -> Self {
+        Self {
+            last_press_time: Instant::now(),
+            press_count: 0,
+        }
+    }
+}
+
 /// Background listener that monitors for device input and executes configured actions
 pub struct BackgroundListener {
     config_manager: Arc<Mutex<ConfigManager>>,
@@ -92,43 +113,111 @@ impl BackgroundListener {
         let mut monitor = RawInputMonitor::new();
         let rx = monitor.start_monitoring_persistent();
 
+        // Track press state per device
+        let mut device_states: HashMap<String, DevicePressState> = HashMap::new();
+
         log::info!("Background listener active, waiting for device input...");
 
         while let Ok(device) = rx.recv() {
             let device_id = format!("{}:{}", device.vendor_id, device.product_id);
+            let now = Instant::now();
+
             log::info!("Device input detected: {}", device_id);
+
+            // Get or create device state
+            let state = device_states
+                .entry(device_id.clone())
+                .or_insert_with(DevicePressState::new);
+
+            // Check time since last press
+            let time_since_last = now.duration_since(state.last_press_time);
+            let is_double_press = time_since_last < Duration::from_millis(DOUBLE_PRESS_WINDOW_MS)
+                && state.press_count >= 1;
+
+            // Update state
+            if is_double_press {
+                state.press_count += 1;
+            } else {
+                state.press_count = 1;
+            }
+            state.last_press_time = now;
+
+            // Determine which trigger type matched
+            let detected_trigger = if state.press_count >= 2 {
+                TriggerType::DoublePress
+            } else {
+                TriggerType::SinglePress
+            };
+
+            log::info!(
+                "Press #{} for {} ({}ms since last) -> {:?}",
+                state.press_count,
+                device_id,
+                time_since_last.as_millis(),
+                detected_trigger
+            );
 
             // Look up binding for this device
             if let Ok(mut config) = self.config_manager.lock() {
                 // Log that we detected input
                 config.add_log(
                     LogEntryLevel::Info,
-                    format!("Button pressed on device {}", device_id),
+                    format!(
+                        "{:?} on device {}",
+                        detected_trigger, device_id
+                    ),
                     Some(device_id.clone()),
                 );
 
                 if let Some(binding) = config.get_binding(&device_id) {
                     if binding.enabled {
-                        let action = binding.action.clone();
-                        let action_desc = format!("{}: {}",
-                            match action.r#type {
-                                ActionType::LaunchApp => "Launch App",
-                                ActionType::RunScript => "Run Script",
-                                ActionType::SystemCommand => "System Command",
-                                ActionType::Hotkey => "Hotkey",
-                            },
-                            action.executable_path
-                        );
+                        // Check if the binding's trigger type matches what we detected
+                        let should_execute = match (&binding.trigger_type, &detected_trigger) {
+                            // Single press: execute only on first press (not on double)
+                            (TriggerType::SinglePress, TriggerType::SinglePress) => true,
+                            // Double press: execute only when double press detected
+                            (TriggerType::DoublePress, TriggerType::DoublePress) => true,
+                            // Long press: not yet implemented
+                            (TriggerType::LongPress, _) => false,
+                            // Other combinations don't match
+                            _ => false,
+                        };
 
-                        // Log that we're about to execute
-                        config.add_log(
-                            LogEntryLevel::Info,
-                            format!("Executing: {}", action_desc),
-                            Some(device_id.clone()),
-                        );
+                        if should_execute {
+                            let action = binding.action.clone();
+                            let action_desc = format!(
+                                "{}: {}",
+                                match action.r#type {
+                                    ActionType::LaunchApp => "Launch App",
+                                    ActionType::RunScript => "Run Script",
+                                    ActionType::SystemCommand => "System Command",
+                                    ActionType::Hotkey => "Hotkey",
+                                },
+                                action.executable_path
+                            );
 
-                        drop(config); // Release lock before executing
-                        self.execute_action(&action, &device_id);
+                            config.add_log(
+                                LogEntryLevel::Info,
+                                format!("Executing ({:?}): {}", detected_trigger, action_desc),
+                                Some(device_id.clone()),
+                            );
+
+                            drop(config); // Release lock before executing
+                            self.execute_action(&action, &device_id);
+
+                            // Reset press count after executing double-press
+                            if detected_trigger == TriggerType::DoublePress {
+                                if let Some(s) = device_states.get_mut(&device_id) {
+                                    s.press_count = 0;
+                                }
+                            }
+                        } else {
+                            log::debug!(
+                                "Trigger type mismatch: binding expects {:?}, detected {:?}",
+                                binding.trigger_type,
+                                detected_trigger
+                            );
+                        }
                     } else {
                         config.add_log(
                             LogEntryLevel::Warn,
