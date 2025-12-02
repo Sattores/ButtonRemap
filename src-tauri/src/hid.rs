@@ -474,3 +474,99 @@ impl InputMonitor for HidManager {
         "HID"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_device_refresh_result_creation() {
+        let result = DeviceRefreshResult {
+            devices: vec![],
+            disconnected_ids: vec!["1234:5678".to_string()],
+        };
+        assert!(result.devices.is_empty());
+        assert_eq!(result.disconnected_ids.len(), 1);
+        assert_eq!(result.disconnected_ids[0], "1234:5678");
+    }
+
+    #[test]
+    fn test_hid_error_display() {
+        let err = HidError::InitError("test error".to_string());
+        assert!(err.to_string().contains("test error"));
+
+        let err = HidError::DeviceNotFound("1234:5678".to_string());
+        assert!(err.to_string().contains("1234:5678"));
+
+        let err = HidError::OpenError("access denied".to_string());
+        assert!(err.to_string().contains("access denied"));
+
+        let err = HidError::ReadError("timeout".to_string());
+        assert!(err.to_string().contains("timeout"));
+    }
+
+    #[test]
+    fn test_configured_devices_tracking() {
+        // This test requires HID API to be available
+        // Skip if HidManager::new() fails (no USB access)
+        let manager = match HidManager::new() {
+            Ok(m) => m,
+            Err(_) => return, // Skip test if HID API unavailable
+        };
+
+        let mut manager = manager;
+
+        // Initially no devices configured
+        assert!(!manager.configured_devices.contains(&"1234:5678".to_string()));
+
+        // Set device as configured
+        manager.set_device_configured("1234:5678");
+        assert!(manager.configured_devices.contains(&"1234:5678".to_string()));
+
+        // Set same device again (should not duplicate)
+        manager.set_device_configured("1234:5678");
+        assert_eq!(
+            manager.configured_devices.iter().filter(|&id| id == "1234:5678").count(),
+            1
+        );
+
+        // Set device as unconfigured
+        manager.set_device_unconfigured("1234:5678");
+        assert!(!manager.configured_devices.contains(&"1234:5678".to_string()));
+    }
+
+    #[test]
+    fn test_monitoring_state() {
+        // This test requires HID API to be available
+        let manager = match HidManager::new() {
+            Ok(m) => m,
+            Err(_) => return,
+        };
+
+        // Initially not monitoring
+        assert!(!manager.is_monitoring());
+
+        let state = manager.get_monitoring_state();
+        assert!(!state.is_active);
+        assert!(state.detected_device.is_none());
+
+        // Start monitoring
+        let _ = manager.start_monitoring();
+        assert!(manager.is_monitoring());
+
+        // Stop monitoring
+        manager.stop_monitoring();
+        assert!(!manager.is_monitoring());
+    }
+
+    #[test]
+    fn test_previous_devices_tracking() {
+        let manager = match HidManager::new() {
+            Ok(m) => m,
+            Err(_) => return,
+        };
+
+        // Initially empty
+        assert!(manager.previous_devices.is_empty());
+    }
+}
